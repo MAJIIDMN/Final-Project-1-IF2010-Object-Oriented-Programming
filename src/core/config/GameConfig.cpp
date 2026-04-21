@@ -1,1 +1,1 @@
-#include "header/GameConfig.hpp"
+#include "core/config/header/GameConfig.hpp"

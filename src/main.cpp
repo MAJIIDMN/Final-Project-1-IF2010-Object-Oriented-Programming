@@ -6,14 +6,6 @@
 
 #include <SFML/Graphics.hpp>
 
-#include <cstdlib>
-
-#if NIMONSPOLY_ENABLE_SFML
-#include "ui/GUIInput.hpp"
-#include "ui/GUIView.hpp"
-
-#include <SFML/Graphics.hpp>
-
 #include <optional>
 #endif
 

@@ -1,1 +1,1 @@
-#include "header/CommandRegistry.hpp"
+#include "core/command/header/CommandRegistry.hpp"

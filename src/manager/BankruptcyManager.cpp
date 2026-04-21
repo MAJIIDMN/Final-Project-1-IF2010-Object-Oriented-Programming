@@ -1,1 +1,1 @@
-#include "header/BankruptcyManager.hpp"
+#include "manager/header/BankruptcyManager.hpp"
