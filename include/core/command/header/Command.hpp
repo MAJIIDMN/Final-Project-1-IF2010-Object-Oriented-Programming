@@ -1,22 +1,26 @@
 #ifndef CORE_COMMAND_HEADER_COMMAND_HPP
 #define CORE_COMMAND_HEADER_COMMAND_HPP
 
-#include <functional>
 #include <string>
+
+class GameEngine;
+class Player;
+class GameStateView;
 
 class Command {
 public:
-	using Handler = std::function<void()>;
+	explicit Command(std::string name = "", std::string help = "");
+	virtual ~Command();
 
-	Command(std::string name = "", Handler handler = nullptr);
+	virtual void execute(GameEngine& engine, Player& player) = 0;
+	virtual bool canExecute(const GameStateView& state) const;
 
 	const std::string& getName() const;
-	bool isValid() const;
-	void execute() const;
+	const std::string& getHelp() const;
 
 private:
 	std::string name;
-	Handler handler;
+	std::string help;
 
 protected:
 };

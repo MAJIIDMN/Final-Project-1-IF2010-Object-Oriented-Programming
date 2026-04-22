@@ -1,17 +1,19 @@
 #include "core/command/header/Command.hpp"
 
-Command::Command(std::string name, Handler handler) : name(std::move(name)), handler(std::move(handler)) {}
+#include "core/state/header/GameStateView.hpp"
+
+Command::Command(std::string name, std::string help) : name(std::move(name)), help(std::move(help)) {}
+
+Command::~Command() = default;
+
+bool Command::canExecute(const GameStateView&) const {
+	return true;
+}
 
 const std::string& Command::getName() const {
 	return name;
 }
 
-bool Command::isValid() const {
-	return static_cast<bool>(handler);
-}
-
-void Command::execute() const {
-	if (handler) {
-		handler();
-	}
+const std::string& Command::getHelp() const {
+	return help;
 }
