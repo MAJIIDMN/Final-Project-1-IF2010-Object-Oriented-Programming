@@ -3,7 +3,7 @@
 #include <string>
 #include <vector>
 
-#include "utils/Structs.hpp"
+#include "utils/Types.hpp"
 
 // Read-only snapshot passed to IGameView::showBoard() and other render calls.
 // Task 5 (GameEngine) populates this; UI layer only reads it.

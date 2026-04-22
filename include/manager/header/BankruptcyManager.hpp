@@ -3,8 +3,13 @@
 
 class BankruptcyManager {
 public:
+	BankruptcyManager();
+
+	void setBankruptcyThreshold(int threshold);
+	bool isBankrupt(int balance) const;
 
 private:
+	int bankruptcyThreshold;
 
 protected:
 };

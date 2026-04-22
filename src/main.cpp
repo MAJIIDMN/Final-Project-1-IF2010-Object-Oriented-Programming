@@ -19,12 +19,20 @@ int main() {
     GUIInput input(window);
     GameStateView demoState;
 
+    // Each frame while GUIInput blocks on a prompt: re-render the board so the
+    // window stays responsive. showBoard() calls rw.display() internally.
+    input.setRenderCallback([&]() {
+        view.showBoard(demoState);
+    });
+
     // Temporary GUI smoke test loop. GameEngine integration comes later.
     while (window.isOpen()) {
         while (const std::optional<sf::Event> event = window.pollEvent()) {
             if (event->is<sf::Event::Closed>()) {
                 window.close();
             }
+            // Forward events to GUIInput when a prompt is active.
+            input.handleEvent(*event);
         }
 
         view.showBoard(demoState);

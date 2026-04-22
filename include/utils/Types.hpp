@@ -8,6 +8,7 @@
 #include "utils/Enums.hpp"
 
 
+// prevent circular includes
 class Bank;
 class FestivalManager;
 class TransactionLogger;

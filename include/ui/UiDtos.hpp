@@ -6,7 +6,7 @@
 
 #include "models/Money.hpp"
 #include "utils/Enums.hpp"
-#include "utils/Structs.hpp"
+#include "utils/Types.hpp"
 
 
 class PropertyInfo{
