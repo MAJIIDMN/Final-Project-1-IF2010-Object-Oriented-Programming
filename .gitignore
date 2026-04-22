@@ -8,6 +8,7 @@
 *.obj
 build/
 build-*/
+cmake/
 obj/
 bin/
 
@@ -46,3 +47,9 @@ bin/
 
 # mac type shi
 *.DS_Store
+
+#other files
+*.log
+*.tmp
+*.bak
+*.pdf
