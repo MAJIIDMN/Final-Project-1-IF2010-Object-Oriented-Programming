@@ -2,6 +2,7 @@
 #define PLAYER_HPP
 
 #include <string>
+#include <memory>
 #include <vector>
 #include "models/Money.hpp"
 #include "utils/Enums.hpp"
@@ -17,6 +18,12 @@ public:
     static constexpr int MAX_SKILL_CARDS = 2;
 
     Player(const std::string& username, Money startingMoney, PlayerController* controller);
+    ~Player();
+
+    Player(const Player& other) = delete;
+    Player& operator=(const Player& other) = delete;
+    Player(Player&& other) noexcept;
+    Player& operator=(Player&& other) noexcept;
 
     const std::string& getUsername() const;
 
@@ -83,8 +90,10 @@ private:
     int position;
     PlayerStatus status;
     std::vector<PropertyTile*> properties;
-    std::vector<SkillCard*> skillCards;
-    std::vector<Effect*> activeEffects;
+    std::vector<std::unique_ptr<SkillCard>> skillCards;
+    mutable std::vector<SkillCard*> skillCardView;
+    std::vector<std::unique_ptr<Effect>> activeEffects;
+    mutable std::vector<Effect*> activeEffectView;
     PlayerController* controller;
     int jailTurnsRemaining;
     int consecutiveDoubles;
