@@ -1,14 +1,12 @@
-#ifndef ACTION_TILE_HPP
-#define ACTION_TILE_HPP
+#ifndef TILE_HEADER_ACTION_TILE_HPP
+#define TILE_HEADER_ACTION_TILE_HPP
 
-#include "Tile.hpp"
+#include "tile/header/Tile.hpp"
+#include "utils/Enums.hpp"
 
 class ActionTile : public Tile {
 public:
-
-private:
-
-protected:
+	ActionTile(int id, const std::string& code, const std::string& name, TileType type);
 };
 
 #endif
