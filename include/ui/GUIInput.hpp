@@ -89,9 +89,9 @@ public:
     string    getPropertyCodeInput(const string& prompt) override;
 
 private:
-    sf::RenderWindow*  window_;
-    GUIPromptState     prompt_;
-    GUIRenderCallback  renderCallback_;
+    [[maybe_unused]] sf::RenderWindow* window_;
+    GUIPromptState    prompt_;
+    GUIRenderCallback renderCallback_;
 
     // Blocks until prompt_.resolved == true while pumping SFML events.
     void waitForResolution();

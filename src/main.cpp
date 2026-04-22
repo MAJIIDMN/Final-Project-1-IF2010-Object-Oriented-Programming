@@ -2,6 +2,7 @@
 
 #if NIMONSPOLY_ENABLE_SFML
 #include "core/state/header/GameStateView.hpp"
+#include "ui/AssetManager.hpp"
 #include "ui/GUIInput.hpp"
 #include "ui/GUIView.hpp"
 
@@ -12,8 +13,10 @@
 
 int main() {
 #if NIMONSPOLY_ENABLE_SFML
-    sf::RenderWindow window(sf::VideoMode(sf::Vector2u{1024u, 768u}), "NIMONSPOLY");
+    sf::RenderWindow window(sf::VideoMode(sf::Vector2u{1440u, 900u}), "NIMONSPOLY");
     window.setFramerateLimit(60);
+
+    AssetManager::get().loadAll();
 
     GUIView view(window);
     GUIInput input(window);
