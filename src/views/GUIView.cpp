@@ -5,6 +5,7 @@
 
 #if NIMONSPOLY_ENABLE_SFML
 #include <SFML/Graphics.hpp>
+#include <SFML/Window/Event.hpp>
 
 #include <algorithm>
 #include <array>
@@ -127,6 +128,666 @@ static void drawTileCard(sf::RenderWindow& rw,
     label.setPosition({pos.x + tileSz * 0.5f,
                        badgeY + tileSz * badgeFrac * 0.5f});
     rw.draw(label, rs);
+}
+
+// ── Helper: draw globe background shared across menu screens ─────────────────
+#if NIMONSPOLY_ENABLE_SFML
+static void drawGlobeBackground(sf::RenderWindow& rw) {
+    const sf::Vector2u sz = rw.getSize();
+    const float cx = sz.x * 0.5f;
+    const float cy = sz.y * 0.5f;
+    const float r  = std::min(sz.x, sz.y) * 0.44f;
+
+    // Outer glow (large, very transparent)
+    sf::CircleShape glow(r * 1.35f);
+    glow.setFillColor(sf::Color(100, 160, 255, 18));
+    glow.setOrigin({r * 1.35f, r * 1.35f});
+    glow.setPosition({cx, cy});
+    rw.draw(glow);
+
+    // Globe body
+    sf::CircleShape globe(r);
+    globe.setFillColor(sf::Color(0x0d, 0x18, 0x2e));
+    globe.setOutlineThickness(2.f);
+    globe.setOutlineColor(sf::Color(100, 160, 255, 80));
+    globe.setOrigin({r, r});
+    globe.setPosition({cx, cy});
+    rw.draw(globe);
+
+    // Inner atmosphere ring
+    sf::CircleShape atm(r * 0.92f);
+    atm.setFillColor(sf::Color(0, 0, 0, 0));
+    atm.setOutlineThickness(r * 0.06f);
+    atm.setOutlineColor(sf::Color(120, 180, 255, 40));
+    atm.setOrigin({r * 0.92f, r * 0.92f});
+    atm.setPosition({cx, cy});
+    rw.draw(atm);
+}
+
+// Helper: centered sf::Text drawn with given font key, char size, color, y pos
+static void drawCenteredText(sf::RenderWindow& rw, AssetManager& am,
+                              const std::string& fontKey, const std::string& str,
+                              unsigned charSz, sf::Color color, float y) {
+    sf::Text t(am.font(fontKey), str, charSz);
+    t.setFillColor(color);
+    auto b = t.getLocalBounds();
+    t.setOrigin({b.position.x + b.size.x * 0.5f, b.position.y + b.size.y * 0.5f});
+    t.setPosition({static_cast<float>(rw.getSize().x) * 0.5f, y});
+    rw.draw(t);
+}
+
+// Helper: neumorphic-style button rect, returns its bounding FloatRect
+static void drawMenuButton(sf::RenderWindow& rw, AssetManager& am,
+                           const std::string& label,
+                           sf::Vector2f center, sf::Vector2f sz,
+                           bool hovered, bool selected = false) {
+    sf::RectangleShape btn(sz);
+    btn.setOrigin({sz.x * 0.5f, sz.y * 0.5f});
+    btn.setPosition(center);
+    sf::Color fill = selected  ? sf::Color(255, 255, 255, 210)
+                   : hovered   ? sf::Color(255, 255, 255,  60)
+                               : sf::Color(255, 255, 255,  20);
+    btn.setFillColor(fill);
+    btn.setOutlineThickness(1.f);
+    btn.setOutlineColor(sf::Color(255, 255, 255, selected ? 200 : 60));
+    rw.draw(btn);
+
+    sf::Color tc = (selected || hovered) ? sf::Color(255, 255, 255)
+                                         : sf::Color(180, 200, 220);
+    unsigned csz = static_cast<unsigned>(sz.y * 0.52f);
+    sf::Text t(am.font("bold"), label, csz);
+    t.setFillColor(tc);
+    auto b = t.getLocalBounds();
+    t.setOrigin({b.position.x + b.size.x * 0.5f, b.position.y + b.size.y * 0.5f});
+    t.setPosition(center);
+    rw.draw(t);
+}
+#endif  // NIMONSPOLY_ENABLE_SFML
+
+// ── Screen: Landing Page ──────────────────────────────────────────────────────
+void GUIView::drawLandingPage() {
+#if NIMONSPOLY_ENABLE_SFML
+    if (!window) return;
+    sf::RenderWindow& rw = *window;
+    AssetManager& am = AssetManager::get();
+
+    rw.clear(sf::Color(0x1a, 0x27, 0x44));
+    drawGlobeBackground(rw);
+
+    const float cx = static_cast<float>(rw.getSize().x) * 0.5f;
+    const float cy = static_cast<float>(rw.getSize().y) * 0.5f;
+    const float h  = static_cast<float>(rw.getSize().y);
+
+    // Title
+    unsigned titleSz = static_cast<unsigned>(h * 0.12f);
+    drawCenteredText(rw, am, "title", "NIMONS", titleSz,
+                     sf::Color(255, 255, 255), cy - h * 0.10f);
+    drawCenteredText(rw, am, "title", "POLY",   titleSz,
+                     sf::Color(255, 255, 255), cy + h * 0.02f);
+
+    // Subtitle
+    unsigned subSz = static_cast<unsigned>(h * 0.025f);
+    drawCenteredText(rw, am, "regular", "presented by BurntCheesecake", subSz,
+                     sf::Color(140, 170, 200), cy + h * 0.12f);
+
+    // Suit decorations
+    unsigned suitSz = static_cast<unsigned>(h * 0.08f);
+    {
+        sf::Text ls(am.font("bold"), "♠", suitSz);
+        ls.setFillColor(sf::Color(255, 255, 255, 80));
+        auto b = ls.getLocalBounds();
+        ls.setOrigin({b.position.x + b.size.x * 0.5f, b.position.y + b.size.y * 0.5f});
+        ls.setPosition({cx - h * 0.32f, cy - h * 0.04f});
+        rw.draw(ls);
+
+        sf::Text rs(am.font("bold"), "♣", suitSz);
+        rs.setFillColor(sf::Color(255, 255, 255, 80));
+        b = rs.getLocalBounds();
+        rs.setOrigin({b.position.x + b.size.x * 0.5f, b.position.y + b.size.y * 0.5f});
+        rs.setPosition({cx + h * 0.32f, cy - h * 0.04f});
+        rw.draw(rs);
+    }
+
+    // Menu items
+    const char* items[] = {"New Game", "Load Game", "Credits", "Exit"};
+    const float btnW = h * 0.28f;
+    const float btnH = h * 0.058f;
+    const float startY = cy + h * 0.22f;
+    const float gap    = h * 0.072f;
+    for (int i = 0; i < 4; ++i) {
+        drawMenuButton(rw, am, items[i],
+                       {cx, startY + i * gap}, {btnW, btnH},
+                       hoveredItem_ == i);
+    }
+
+    rw.display();
+#endif
+}
+
+// ── Screen: Num Players ───────────────────────────────────────────────────────
+void GUIView::drawNumPlayers() {
+#if NIMONSPOLY_ENABLE_SFML
+    if (!window) return;
+    sf::RenderWindow& rw = *window;
+    AssetManager& am = AssetManager::get();
+
+    rw.clear(sf::Color(0x1a, 0x27, 0x44));
+    drawGlobeBackground(rw);
+
+    const float cx = static_cast<float>(rw.getSize().x) * 0.5f;
+    const float cy = static_cast<float>(rw.getSize().y) * 0.5f;
+    const float h  = static_cast<float>(rw.getSize().y);
+
+    // Panel
+    const float panelW = h * 0.55f, panelH = h * 0.42f;
+    sf::RectangleShape panel({panelW, panelH});
+    panel.setOrigin({panelW * 0.5f, panelH * 0.5f});
+    panel.setPosition({cx, cy});
+    panel.setFillColor(sf::Color(20, 32, 60, 220));
+    panel.setOutlineThickness(1.f);
+    panel.setOutlineColor(sf::Color(100, 140, 200, 80));
+    rw.draw(panel);
+
+    unsigned hSz = static_cast<unsigned>(h * 0.038f);
+    drawCenteredText(rw, am, "bold", "Choose number of players", hSz,
+                     sf::Color(220, 235, 255), cy - panelH * 0.32f);
+
+    const char* opts[] = {"2 Players", "3 Players", "4 Players"};
+    const float btnW = panelW * 0.55f, btnH = h * 0.066f;
+    const float startY = cy - panelH * 0.08f;
+    const float gap    = h * 0.09f;
+    for (int i = 0; i < 3; ++i) {
+        bool sel = (setup_.numPlayers == i + 2);
+        drawMenuButton(rw, am, opts[i],
+                       {cx, startY + i * gap}, {btnW, btnH},
+                       hoveredItem_ == i, sel);
+    }
+
+    // Next button
+    drawMenuButton(rw, am, "Next >",
+                   {cx, cy + panelH * 0.38f}, {btnW * 0.5f, btnH},
+                   hoveredItem_ == 10);
+
+    rw.display();
+#endif
+}
+
+// ── Screen: Cust Player ───────────────────────────────────────────────────────
+void GUIView::drawCustPlayer() {
+#if NIMONSPOLY_ENABLE_SFML
+    if (!window) return;
+    sf::RenderWindow& rw = *window;
+    AssetManager& am = AssetManager::get();
+
+    rw.clear(sf::Color(0x1a, 0x27, 0x44));
+    drawGlobeBackground(rw);
+
+    const float W  = static_cast<float>(rw.getSize().x);
+    const float H  = static_cast<float>(rw.getSize().y);
+    const float cx = W * 0.5f, cy = H * 0.5f;
+
+    // Header
+    unsigned hSz = static_cast<unsigned>(H * 0.036f);
+    drawCenteredText(rw, am, "bold", "< Customize Player", hSz,
+                     sf::Color(220, 235, 255), H * 0.08f);
+
+    // Left sidebar tabs
+    const float tabW = W * 0.12f, tabH = H * 0.07f;
+    const float tabX = W * 0.18f;
+    const float tabStartY = cy - setup_.numPlayers * tabH * 0.5f;
+    const sf::Color tabColors[] = {
+        sf::Color(0x00, 0xc8, 0xff),
+        sf::Color(0xff, 0x2d, 0x8a),
+        sf::Color(0xff, 0xf2, 0x00),
+        sf::Color(0x00, 0xff, 0xb0),
+    };
+    for (int i = 0; i < setup_.numPlayers; ++i) {
+        bool sel = (i == custPlayerTab_);
+        sf::RectangleShape tab({tabW, tabH * 0.85f});
+        tab.setOrigin({tabW * 0.5f, tabH * 0.85f * 0.5f});
+        tab.setPosition({tabX, tabStartY + i * tabH});
+        tab.setFillColor(sel ? sf::Color(tabColors[i % 4].r,
+                                         tabColors[i % 4].g,
+                                         tabColors[i % 4].b, 200)
+                             : sf::Color(255, 255, 255, 25));
+        tab.setOutlineThickness(1.f);
+        tab.setOutlineColor(sf::Color(tabColors[i % 4].r,
+                                      tabColors[i % 4].g,
+                                      tabColors[i % 4].b, 120));
+        rw.draw(tab);
+
+        std::string label = "P" + std::to_string(i + 1);
+        unsigned tsz = static_cast<unsigned>(tabH * 0.4f);
+        sf::Text t(am.font("bold"), label, tsz);
+        t.setFillColor(sel ? sf::Color(0, 0, 0) : sf::Color(180, 200, 220));
+        auto b = t.getLocalBounds();
+        t.setOrigin({b.position.x + b.size.x * 0.5f, b.position.y + b.size.y * 0.5f});
+        t.setPosition({tabX, tabStartY + i * tabH});
+        rw.draw(t);
+    }
+
+    // Right form panel
+    const float panelX = cx - W * 0.02f;
+    const float panelW = W * 0.42f, panelH = H * 0.60f;
+    sf::RectangleShape panel({panelW, panelH});
+    panel.setOrigin({panelW * 0.5f, panelH * 0.5f});
+    panel.setPosition({panelX, cy});
+    panel.setFillColor(sf::Color(20, 32, 60, 220));
+    panel.setOutlineThickness(1.f);
+    panel.setOutlineColor(sf::Color(100, 140, 200, 60));
+    rw.draw(panel);
+
+    int p = custPlayerTab_;
+    float formX = panelX;
+    float rowY = cy - panelH * 0.35f;
+    float rowStep = H * 0.1f;
+    unsigned lSz = static_cast<unsigned>(H * 0.028f);
+
+    // Name label + box
+    drawCenteredText(rw, am, "bold", "Name", lSz, sf::Color(160, 185, 215), rowY);
+    rowY += rowStep * 0.5f;
+    {
+        sf::RectangleShape nameBox({panelW * 0.75f, H * 0.054f});
+        nameBox.setOrigin({nameBox.getSize().x * 0.5f, nameBox.getSize().y * 0.5f});
+        nameBox.setPosition({formX, rowY});
+        nameBox.setFillColor(sf::Color(255, 255, 255, 30));
+        nameBox.setOutlineThickness(1.f);
+        nameBox.setOutlineColor(sf::Color(255, 255, 255, 80));
+        rw.draw(nameBox);
+
+        std::string name = (p < static_cast<int>(setup_.playerNames.size()))
+                           ? setup_.playerNames[static_cast<size_t>(p)]
+                           : "";
+        sf::Text nt(am.font("bold"), name.empty() ? "Player " + std::to_string(p+1) : name,
+                    static_cast<unsigned>(H * 0.026f));
+        nt.setFillColor(name.empty() ? sf::Color(120, 140, 160) : sf::Color(230, 240, 255));
+        auto b = nt.getLocalBounds();
+        nt.setOrigin({b.position.x, b.position.y + b.size.y * 0.5f});
+        nt.setPosition({formX - panelW * 0.75f * 0.46f, rowY});
+        rw.draw(nt);
+    }
+    rowY += rowStep;
+
+    // Color swatches
+    drawCenteredText(rw, am, "bold", "Color", lSz, sf::Color(160, 185, 215), rowY);
+    rowY += rowStep * 0.5f;
+    {
+        const float swSz = H * 0.054f;
+        const float swGap = swSz * 1.3f;
+        float swStartX = formX - swGap * 1.5f;
+        int selColor = (p < static_cast<int>(setup_.playerColors.size()))
+                       ? setup_.playerColors[static_cast<size_t>(p)] : p;
+        for (int ci = 0; ci < 4; ++ci) {
+            sf::RectangleShape sw({swSz, swSz});
+            sw.setOrigin({swSz * 0.5f, swSz * 0.5f});
+            sw.setPosition({swStartX + ci * swGap, rowY});
+            sw.setFillColor(tabColors[ci]);
+            sw.setOutlineThickness(ci == selColor ? 3.f : 1.f);
+            sw.setOutlineColor(ci == selColor ? sf::Color(255,255,255)
+                                              : sf::Color(255,255,255,60));
+            rw.draw(sw);
+        }
+    }
+    rowY += rowStep;
+
+    // Human / Computer
+    drawCenteredText(rw, am, "bold", "Type", lSz, sf::Color(160, 185, 215), rowY);
+    rowY += rowStep * 0.5f;
+    {
+        bool isComp = (p < static_cast<int>(setup_.isComputer.size()))
+                      && setup_.isComputer[static_cast<size_t>(p)];
+        drawMenuButton(rw, am, "Human",    {formX - H * 0.09f, rowY},
+                       {H * 0.14f, H * 0.054f}, false, !isComp);
+        drawMenuButton(rw, am, "Computer", {formX + H * 0.09f, rowY},
+                       {H * 0.16f, H * 0.054f}, false,  isComp);
+    }
+
+    // Next button
+    drawMenuButton(rw, am, "Next >",
+                   {cx + W * 0.22f, cy + panelH * 0.44f},
+                   {H * 0.16f, H * 0.054f}, hoveredItem_ == 10);
+
+    rw.display();
+#endif
+}
+
+// ── Screen: Cust Map ──────────────────────────────────────────────────────────
+void GUIView::drawCustMap() {
+#if NIMONSPOLY_ENABLE_SFML
+    if (!window) return;
+    sf::RenderWindow& rw = *window;
+    AssetManager& am = AssetManager::get();
+
+    rw.clear(sf::Color(0x1a, 0x27, 0x44));
+    drawGlobeBackground(rw);
+
+    const float W = static_cast<float>(rw.getSize().x);
+    const float H = static_cast<float>(rw.getSize().y);
+    const float cx = W * 0.5f, cy = H * 0.5f;
+
+    unsigned hSz = static_cast<unsigned>(H * 0.036f);
+    drawCenteredText(rw, am, "bold", "< Customize Map", hSz,
+                     sf::Color(220, 235, 255), H * 0.08f);
+
+    drawCenteredText(rw, am, "regular", "Number of Tiles", static_cast<unsigned>(H * 0.028f),
+                     sf::Color(160, 185, 215), cy - H * 0.22f);
+
+    const int tileOptions[] = {20, 24, 28, 32, 36, 40, 44, 48, 52, 56, 60};
+    const int N = 11;
+    const int cols = 4;
+    const float btnW = H * 0.12f, btnH = H * 0.058f, gap = H * 0.015f;
+    const float gridW = cols * (btnW + gap) - gap;
+    const float startX = cx - gridW * 0.5f + btnW * 0.5f;
+    const float startY = cy - H * 0.12f;
+
+    for (int i = 0; i < N; ++i) {
+        int col = i % cols, row = i / cols;
+        float bx = startX + col * (btnW + gap);
+        float by = startY + row * (btnH + gap);
+        bool sel = (setup_.numTiles == tileOptions[i]);
+        drawMenuButton(rw, am, std::to_string(tileOptions[i]),
+                       {bx, by}, {btnW, btnH},
+                       hoveredItem_ == i, sel);
+    }
+
+    drawMenuButton(rw, am, "Start Game",
+                   {cx, cy + H * 0.32f}, {H * 0.24f, H * 0.062f},
+                   hoveredItem_ == 20);
+
+    rw.display();
+#endif
+}
+
+// ── Screen: Load Game ─────────────────────────────────────────────────────────
+void GUIView::drawLoadGame() {
+#if NIMONSPOLY_ENABLE_SFML
+    if (!window) return;
+    sf::RenderWindow& rw = *window;
+    AssetManager& am = AssetManager::get();
+
+    rw.clear(sf::Color(0x1a, 0x27, 0x44));
+    drawGlobeBackground(rw);
+
+    const float W = static_cast<float>(rw.getSize().x);
+    const float H = static_cast<float>(rw.getSize().y);
+    const float cx = W * 0.5f, cy = H * 0.5f;
+
+    unsigned hSz = static_cast<unsigned>(H * 0.038f);
+    drawCenteredText(rw, am, "bold", "Load Game", hSz,
+                     sf::Color(220, 235, 255), cy - H * 0.20f);
+
+    drawCenteredText(rw, am, "regular", "Enter save file path:", static_cast<unsigned>(H * 0.026f),
+                     sf::Color(160, 185, 215), cy - H * 0.10f);
+
+    // Input box
+    const float boxW = H * 0.54f, boxH = H * 0.058f;
+    sf::RectangleShape box({boxW, boxH});
+    box.setOrigin({boxW * 0.5f, boxH * 0.5f});
+    box.setPosition({cx, cy});
+    box.setFillColor(sf::Color(255, 255, 255, 30));
+    box.setOutlineThickness(1.f);
+    box.setOutlineColor(sf::Color(255, 255, 255, 100));
+    rw.draw(box);
+
+    std::string display = setup_.loadFilePath.empty() ? "saves/game.json" : setup_.loadFilePath;
+    sf::Color textC = setup_.loadFilePath.empty() ? sf::Color(100, 120, 150) : sf::Color(230, 240, 255);
+    unsigned tsz = static_cast<unsigned>(H * 0.026f);
+    sf::Text t(am.font("regular"), display, tsz);
+    t.setFillColor(textC);
+    auto b = t.getLocalBounds();
+    t.setOrigin({b.position.x, b.position.y + b.size.y * 0.5f});
+    t.setPosition({cx - boxW * 0.46f, cy});
+    rw.draw(t);
+
+    drawMenuButton(rw, am, "Load",
+                   {cx, cy + H * 0.14f}, {H * 0.18f, H * 0.062f},
+                   hoveredItem_ == 0);
+
+    rw.display();
+#endif
+}
+
+// ── renderCurrentScreen & handleMenuEvent ─────────────────────────────────────
+void GUIView::renderCurrentScreen() {
+    switch (screen_) {
+        case AppScreen::LANDING:              drawLandingPage(); break;
+        case AppScreen::NEW_GAME_NUM_PLAYERS: drawNumPlayers();  break;
+        case AppScreen::NEW_GAME_CUST_PLAYER: drawCustPlayer();  break;
+        case AppScreen::NEW_GAME_CUST_MAP:    drawCustMap();     break;
+        case AppScreen::LOAD_GAME:            drawLoadGame();    break;
+        case AppScreen::IN_GAME:
+        case AppScreen::GAME_OVER:            break;  // caller handles showBoard
+    }
+}
+
+bool GUIView::handleMenuEvent(const sf::Event& event) {
+#if NIMONSPOLY_ENABLE_SFML
+    if (!window) return false;
+    const float H = static_cast<float>(window->getSize().y);
+    const float cx = static_cast<float>(window->getSize().x) * 0.5f;
+    const float cy = static_cast<float>(window->getSize().y) * 0.5f;
+
+    // Track mouse position for hover
+    if (const auto* mm = event.getIf<sf::Event::MouseMoved>()) {
+        float mx = static_cast<float>(mm->position.x);
+        float my = static_cast<float>(mm->position.y);
+        hoveredItem_ = -1;
+
+        if (screen_ == AppScreen::LANDING) {
+            const float btnW = H * 0.28f, btnH = H * 0.058f;
+            const float startY = cy + H * 0.22f, gap = H * 0.072f;
+            for (int i = 0; i < 4; ++i) {
+                float by = startY + i * gap;
+                if (mx >= cx - btnW * 0.5f && mx <= cx + btnW * 0.5f &&
+                    my >= by - btnH * 0.5f && my <= by + btnH * 0.5f)
+                    hoveredItem_ = i;
+            }
+        } else if (screen_ == AppScreen::NEW_GAME_NUM_PLAYERS) {
+            const float panelH = H * 0.42f;
+            const float btnW = H * 0.55f * 0.55f, btnH = H * 0.066f;
+            const float startY = cy - panelH * 0.08f, gap = H * 0.09f;
+            for (int i = 0; i < 3; ++i) {
+                float by = startY + i * gap;
+                if (mx >= cx - btnW * 0.5f && mx <= cx + btnW * 0.5f &&
+                    my >= by - btnH * 0.5f && my <= by + btnH * 0.5f)
+                    hoveredItem_ = i;
+            }
+            float nextY = cy + panelH * 0.38f;
+            if (my >= nextY - btnH * 0.5f && my <= nextY + btnH * 0.5f)
+                hoveredItem_ = 10;
+        } else if (screen_ == AppScreen::NEW_GAME_CUST_MAP) {
+            const int tileOptions[] = {20,24,28,32,36,40,44,48,52,56,60};
+            const int cols = 4;
+            const float btnW = H * 0.12f, btnH = H * 0.058f, gap = H * 0.015f;
+            const float gridW = cols * (btnW + gap) - gap;
+            const float startX = cx - gridW * 0.5f + btnW * 0.5f;
+            const float startY = cy - H * 0.12f;
+            for (int i = 0; i < 11; ++i) {
+                float bx = startX + (i % cols) * (btnW + gap);
+                float by = startY + (i / cols) * (btnH + gap);
+                if (mx >= bx - btnW * 0.5f && mx <= bx + btnW * 0.5f &&
+                    my >= by - btnH * 0.5f && my <= by + btnH * 0.5f)
+                    hoveredItem_ = i;
+                (void)tileOptions;
+            }
+            float startY2 = cy + H * 0.32f;
+            const float bigW = H * 0.24f, bigH = H * 0.062f;
+            if (mx >= cx - bigW * 0.5f && mx <= cx + bigW * 0.5f &&
+                my >= startY2 - bigH * 0.5f && my <= startY2 + bigH * 0.5f)
+                hoveredItem_ = 20;
+        } else if (screen_ == AppScreen::LOAD_GAME) {
+            float loadY = cy + H * 0.14f;
+            const float bW = H * 0.18f, bH = H * 0.062f;
+            if (mx >= cx - bW * 0.5f && mx <= cx + bW * 0.5f &&
+                my >= loadY - bH * 0.5f && my <= loadY + bH * 0.5f)
+                hoveredItem_ = 0;
+        }
+        return false;
+    }
+
+    if (const auto* mb = event.getIf<sf::Event::MouseButtonPressed>()) {
+        if (mb->button != sf::Mouse::Button::Left) return false;
+        float mx = static_cast<float>(mb->position.x);
+        float my = static_cast<float>(mb->position.y);
+
+        if (screen_ == AppScreen::LANDING) {
+            const float btnW = H * 0.28f, btnH = H * 0.058f;
+            const float startY = cy + H * 0.22f, gap = H * 0.072f;
+            for (int i = 0; i < 4; ++i) {
+                float by = startY + i * gap;
+                if (mx >= cx - btnW * 0.5f && mx <= cx + btnW * 0.5f &&
+                    my >= by - btnH * 0.5f && my <= by + btnH * 0.5f) {
+                    if (i == 0) { screen_ = AppScreen::NEW_GAME_NUM_PLAYERS; hoveredItem_ = -1; }
+                    else if (i == 1) { screen_ = AppScreen::LOAD_GAME; hoveredItem_ = -1; }
+                    else if (i == 3) { window->close(); }
+                }
+            }
+        } else if (screen_ == AppScreen::NEW_GAME_NUM_PLAYERS) {
+            const float panelH = H * 0.42f;
+            const float btnW = H * 0.55f * 0.55f, btnH = H * 0.066f;
+            const float startY = cy - panelH * 0.08f, gap = H * 0.09f;
+            for (int i = 0; i < 3; ++i) {
+                float by = startY + i * gap;
+                if (mx >= cx - btnW * 0.5f && mx <= cx + btnW * 0.5f &&
+                    my >= by - btnH * 0.5f && my <= by + btnH * 0.5f)
+                    setup_.numPlayers = i + 2;
+            }
+            float nextY = cy + panelH * 0.38f;
+            const float nextW = btnW * 0.5f;
+            if (mx >= cx - nextW * 0.5f && mx <= cx + nextW * 0.5f &&
+                my >= nextY - btnH * 0.5f && my <= nextY + btnH * 0.5f) {
+                // Init player data
+                setup_.playerNames.assign(static_cast<size_t>(setup_.numPlayers), "");
+                setup_.isComputer.assign(static_cast<size_t>(setup_.numPlayers), false);
+                setup_.playerColors.clear();
+                for (int i = 0; i < setup_.numPlayers; ++i)
+                    setup_.playerColors.push_back(i);
+                custPlayerTab_ = 0;
+                screen_ = AppScreen::NEW_GAME_CUST_PLAYER;
+                hoveredItem_ = -1;
+            }
+        } else if (screen_ == AppScreen::NEW_GAME_CUST_PLAYER) {
+            // Tab click
+            const float H2 = H;
+            const float tabW = static_cast<float>(window->getSize().x) * 0.12f;
+            const float tabH = H2 * 0.07f;
+            const float tabX = static_cast<float>(window->getSize().x) * 0.18f;
+            const float tabStartY = cy - setup_.numPlayers * tabH * 0.5f;
+            for (int i = 0; i < setup_.numPlayers; ++i) {
+                float ty = tabStartY + i * tabH;
+                if (mx >= tabX - tabW * 0.5f && mx <= tabX + tabW * 0.5f &&
+                    my >= ty - tabH * 0.85f * 0.5f && my <= ty + tabH * 0.85f * 0.5f)
+                    custPlayerTab_ = i;
+            }
+            // Human/Computer buttons
+            int p = custPlayerTab_;
+            float formX = cx - static_cast<float>(window->getSize().x) * 0.02f;
+            float typeY = cy - H * 0.42f * 0.35f + H * 0.1f * 2.5f;
+            // roughly: startY + 2.5 * rowStep; use hit test
+            const float tbH = H * 0.054f;
+            if (my >= typeY - tbH * 0.5f && my <= typeY + tbH * 0.5f) {
+                if (mx >= formX - H * 0.18f && mx <= formX - H * 0.02f) {
+                    if (p < static_cast<int>(setup_.isComputer.size()))
+                        setup_.isComputer[static_cast<size_t>(p)] = false;
+                } else if (mx >= formX + H * 0.01f && mx <= formX + H * 0.18f) {
+                    if (p < static_cast<int>(setup_.isComputer.size()))
+                        setup_.isComputer[static_cast<size_t>(p)] = true;
+                }
+            }
+            // Color swatches
+            float clrY = cy - H * 0.42f * 0.35f + H * 0.1f * 1.5f;
+            const float swSz = H * 0.054f, swGap = swSz * 1.3f;
+            float swStartX = formX - swGap * 1.5f;
+            for (int ci = 0; ci < 4; ++ci) {
+                float sx = swStartX + ci * swGap;
+                if (mx >= sx - swSz * 0.5f && mx <= sx + swSz * 0.5f &&
+                    my >= clrY - swSz * 0.5f && my <= clrY + swSz * 0.5f) {
+                    if (p < static_cast<int>(setup_.playerColors.size()))
+                        setup_.playerColors[static_cast<size_t>(p)] = ci;
+                }
+            }
+            // Next button
+            float nextX = cx + static_cast<float>(window->getSize().x) * 0.22f;
+            float nextY = cy + H * 0.60f * 0.44f;
+            const float nW = H * 0.16f, nH = H * 0.054f;
+            if (mx >= nextX - nW * 0.5f && mx <= nextX + nW * 0.5f &&
+                my >= nextY - nH * 0.5f && my <= nextY + nH * 0.5f) {
+                screen_ = AppScreen::NEW_GAME_CUST_MAP;
+                hoveredItem_ = -1;
+            }
+        } else if (screen_ == AppScreen::NEW_GAME_CUST_MAP) {
+            const int tileOptions[] = {20,24,28,32,36,40,44,48,52,56,60};
+            const int cols = 4;
+            const float btnW = H * 0.12f, btnH = H * 0.058f, gap = H * 0.015f;
+            const float gridW = cols * (btnW + gap) - gap;
+            const float startX = cx - gridW * 0.5f + btnW * 0.5f;
+            const float startY = cy - H * 0.12f;
+            for (int i = 0; i < 11; ++i) {
+                float bx = startX + (i % cols) * (btnW + gap);
+                float by = startY + (i / cols) * (btnH + gap);
+                if (mx >= bx - btnW * 0.5f && mx <= bx + btnW * 0.5f &&
+                    my >= by - btnH * 0.5f && my <= by + btnH * 0.5f)
+                    setup_.numTiles = tileOptions[i];
+            }
+            float startBtnY = cy + H * 0.32f;
+            const float bigW = H * 0.24f, bigH = H * 0.062f;
+            if (mx >= cx - bigW * 0.5f && mx <= cx + bigW * 0.5f &&
+                my >= startBtnY - bigH * 0.5f && my <= startBtnY + bigH * 0.5f) {
+                screen_ = AppScreen::IN_GAME;
+                return true;   // signal: start game
+            }
+        } else if (screen_ == AppScreen::LOAD_GAME) {
+            float loadY = cy + H * 0.14f;
+            const float bW = H * 0.18f, bH = H * 0.062f;
+            if (mx >= cx - bW * 0.5f && mx <= cx + bW * 0.5f &&
+                my >= loadY - bH * 0.5f && my <= loadY + bH * 0.5f) {
+                screen_ = AppScreen::IN_GAME;
+                return true;   // signal: load game
+            }
+        }
+        return false;
+    }
+
+    // Keyboard: Escape goes back one screen
+    if (const auto* kp = event.getIf<sf::Event::KeyPressed>()) {
+        if (kp->code == sf::Keyboard::Key::Escape) {
+            if (screen_ == AppScreen::NEW_GAME_NUM_PLAYERS ||
+                screen_ == AppScreen::LOAD_GAME)
+                screen_ = AppScreen::LANDING;
+            else if (screen_ == AppScreen::NEW_GAME_CUST_PLAYER)
+                screen_ = AppScreen::NEW_GAME_NUM_PLAYERS;
+            else if (screen_ == AppScreen::NEW_GAME_CUST_MAP)
+                screen_ = AppScreen::NEW_GAME_CUST_PLAYER;
+            hoveredItem_ = -1;
+        }
+        // Load game: text input into loadFilePath
+        if (screen_ == AppScreen::LOAD_GAME) {
+            if (kp->code == sf::Keyboard::Key::Backspace && !setup_.loadFilePath.empty())
+                setup_.loadFilePath.pop_back();
+        }
+    }
+    if (const auto* ti = event.getIf<sf::Event::TextEntered>()) {
+        if (screen_ == AppScreen::LOAD_GAME && ti->unicode >= 32 && ti->unicode < 127) {
+            setup_.loadFilePath += static_cast<char>(ti->unicode);
+        }
+        // CustPlayer name input
+        if (screen_ == AppScreen::NEW_GAME_CUST_PLAYER) {
+            int p = custPlayerTab_;
+            while (static_cast<int>(setup_.playerNames.size()) <= p)
+                setup_.playerNames.emplace_back();
+            if (ti->unicode == 8) {  // backspace
+                if (!setup_.playerNames[static_cast<size_t>(p)].empty())
+                    setup_.playerNames[static_cast<size_t>(p)].pop_back();
+            } else if (ti->unicode >= 32 && ti->unicode < 127 &&
+                       setup_.playerNames[static_cast<size_t>(p)].size() < 16) {
+                setup_.playerNames[static_cast<size_t>(p)] += static_cast<char>(ti->unicode);
+            }
+        }
+    }
+#else
+    (void)event;
+#endif
+    return false;
 }
 
 #endif  // NIMONSPOLY_ENABLE_SFML

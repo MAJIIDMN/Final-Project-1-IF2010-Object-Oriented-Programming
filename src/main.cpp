@@ -2,6 +2,7 @@
 
 #if NIMONSPOLY_ENABLE_SFML
 #include "core/state/header/GameStateView.hpp"
+#include "ui/AppScreen.hpp"
 #include "ui/AssetManager.hpp"
 #include "ui/GUIInput.hpp"
 #include "ui/GUIView.hpp"
@@ -22,28 +23,37 @@ int main() {
     GUIInput input(window);
     GameStateView demoState;
 
-    // Each frame while GUIInput blocks on a prompt: re-render the board so the
-    // window stays responsive. showBoard() calls rw.display() internally.
     input.setRenderCallback([&]() {
-        view.showBoard(demoState);
+        if (view.screen() == AppScreen::IN_GAME)
+            view.showBoard(demoState);
+        else
+            view.renderCurrentScreen();
     });
 
-    // Temporary GUI smoke test loop. GameEngine integration comes later.
     while (window.isOpen()) {
         while (const std::optional<sf::Event> event = window.pollEvent()) {
             if (event->is<sf::Event::Closed>()) {
                 window.close();
+                break;
             }
-            // Forward events to GUIInput when a prompt is active.
-            input.handleEvent(*event);
+
+            if (view.screen() != AppScreen::IN_GAME) {
+                view.handleMenuEvent(*event);
+            } else {
+                input.handleEvent(*event);
+            }
         }
 
-        view.showBoard(demoState);
+        if (!window.isOpen()) break;
+
+        if (view.screen() == AppScreen::IN_GAME)
+            view.showBoard(demoState);
+        else
+            view.renderCurrentScreen();
     }
 
     return EXIT_SUCCESS;
 #else
-    // Foundation build check: the executable should link even before game logic is implemented.
     return EXIT_SUCCESS;
 #endif
 }
