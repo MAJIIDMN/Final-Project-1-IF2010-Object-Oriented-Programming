@@ -23,7 +23,6 @@ void AssetManager::loadAll() {
 
 #if NIMONSPOLY_ENABLE_SFML
 
-// ── Fonts ─────────────────────────────────────────────────────────────────────
 
 void AssetManager::loadFonts() {
     struct FontEntry { std::string key; std::string path; };
@@ -54,7 +53,6 @@ const sf::Font& AssetManager::font(const std::string& key) {
     return defaultFont;
 }
 
-// ── Tiles ─────────────────────────────────────────────────────────────────────
 
 bool AssetManager::tryLoad(sf::Texture& tex,
                             const std::initializer_list<std::string>& paths) {
@@ -65,18 +63,12 @@ bool AssetManager::tryLoad(sf::Texture& tex,
 }
 
 void AssetManager::loadTiles() {
-    // All known tile codes with their subfolder search order.
-    // property/ → railroad/ → utility/ → special/ → root tiles/
     const std::string codes[] = {
-        // Property
         "BDG","BKS","BLP","BGR","DEN","DPK","GRT","IKN","JKT",
         "MAL","MED","MGL","MKS","MND","MTR","PKB","PLB","SBY",
         "SMG","SOL","TSK","YOG",
-        // Railroad
         "GBR","GUB","STB","TGU","TUG",
-        // Utility
         "PAM","PLN",
-        // Special / action
         "GO","PPJ","PEN","BBP","DNU","FES","KSP","PBM","PPH",
     };
 

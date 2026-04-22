@@ -2,6 +2,7 @@
 
 #include "ui/AppScreen.hpp"
 #include "ui/IGameView.hpp"
+#include "utils/Types.hpp"
 
 namespace sf {
 class RenderWindow;
@@ -12,15 +13,12 @@ class GUIView final : public IGameView {
 public:
     explicit GUIView(sf::RenderWindow& window);
 
-    // Screen state machine
     AppScreen  screen() const { return screen_; }
     SetupState& setup()       { return setup_; }
 
-    // Returns true when user has finished setup and wants to start/load a game.
     bool handleMenuEvent(const sf::Event& event);
     void renderCurrentScreen();
 
-    // Draw methods per screen (also callable externally for testing)
     void drawLandingPage();
     void drawNumPlayers();
     void drawCustPlayer();
@@ -76,8 +74,15 @@ private:
     [[maybe_unused]] sf::RenderWindow* window;
     AppScreen  screen_{AppScreen::LANDING};
     SetupState setup_;
-    int        custPlayerTab_{0};    // which player tab is selected in CustPlayer
-
-    // Mouse-over hit tracking (updated each frame in handleMenuEvent)
+    int        custPlayerTab_{0};
     int        hoveredItem_{-1};
+
+    vector<LogEntry> log_;
+    int  lastD1_{0}, lastD2_{0};
+    bool diceRolled_{false};
+    int  logScrollOffset_{0};
+
+    void drawLeftPanel (sf::RenderWindow& rw, const GameStateView& state);
+    void drawRightPanel(sf::RenderWindow& rw, const GameStateView& state);
+    void drawBottomStrip(sf::RenderWindow& rw, const GameStateView& state);
 };
