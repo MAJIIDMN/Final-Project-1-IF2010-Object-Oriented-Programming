@@ -60,9 +60,6 @@ int main() {
 
     engine.initialize(players, engine.getConfig().getMaxTurns());
     engine.start();
-    std::cout << "NIMONSPOLI dimulai. Command utama: CETAK PAPAN, LEMPAR DADU, ATUR DADU x y, "
-                 "CETAK PROPERTI, CETAK AKTA KODE, GADAI KODE, TEBUS KODE, BANGUN KODE, "
-                 "GUNAKAN KEMAMPUAN nomor, SELESAI.\n";
 
     while (engine.isRunning()) {
         if (engine.getState().getCurrentTurn() > engine.getState().getMaxTurn()) {
