@@ -1,0 +1,219 @@
+#include "models/Player.hpp"
+#include "models/effects/Effect.hpp"
+#include "controllers/PlayerController.hpp"
+#include "utils/Exceptions.hpp"
+#include <algorithm>
+
+Player::Player(const std::string& username, Money startingMoney, PlayerController* controller)
+    : username(username), money(startingMoney), position(0),
+      status(PlayerStatus::ACTIVE), controller(controller),
+      jailTurnsRemaining(0), consecutiveDoubles(0),
+      hasUsedSkillCardThisTurn(false), hasRolledDiceThisTurn(false),
+      turnCount(0) {}
+
+const std::string& Player::getUsername() const {
+    return username;
+}
+
+Money Player::getMoney() const {
+    return money;
+}
+
+void Player::addMoney(const Money& amount) {
+    money += amount;
+}
+
+void Player::deductMoney(const Money& amount) {
+    money -= amount;
+}
+
+bool Player::canAfford(const Money& amount) const {
+    return money >= amount;
+}
+
+int Player::getPosition() const {
+    return position;
+}
+
+void Player::setPosition(int pos) {
+    position = pos;
+}
+
+void Player::moveBy(int steps, int boardSize) {
+    position = (position + steps % boardSize + boardSize) % boardSize;
+}
+
+PlayerStatus Player::getStatus() const {
+    return status;
+}
+
+void Player::setStatus(PlayerStatus s) {
+    status = s;
+}
+
+bool Player::isActive() const {
+    return status == PlayerStatus::ACTIVE;
+}
+
+bool Player::isBankrupt() const {
+    return status == PlayerStatus::BANKRUPT;
+}
+
+bool Player::isJailed() const {
+    return status == PlayerStatus::JAILED;
+}
+
+const std::vector<PropertyTile*>& Player::getProperties() const {
+    return properties;
+}
+
+void Player::addProperty(PropertyTile* tile) {
+    properties.push_back(tile);
+}
+
+void Player::removeProperty(PropertyTile* tile) {
+    properties.erase(std::remove(properties.begin(), properties.end(), tile), properties.end());
+}
+
+std::vector<StreetTile*> Player::getPropertiesByColor(Color color) const {
+    (void)color;
+    // Kelas lain belum diimplement
+    return {};
+}
+
+bool Player::hasMonopoly(Color color) const {
+    (void)color;
+    return false;
+}
+
+int Player::countRailroads() const {
+    return 0;
+}
+
+int Player::countUtilities() const {
+    return 0;
+}
+
+const std::vector<SkillCard*>& Player::getSkillCards() const {
+    return skillCards;
+}
+
+void Player::addSkillCard(SkillCard* card) {
+    if (static_cast<int>(skillCards.size()) >= MAX_SKILL_CARDS)
+        throw CardSlotFullException(MAX_SKILL_CARDS);
+    skillCards.push_back(card);
+}
+
+SkillCard* Player::removeSkillCard(int index) {
+    if (index < 0 || index >= static_cast<int>(skillCards.size())) {
+        return nullptr;
+    }
+    SkillCard* c = skillCards[index];
+    skillCards.erase(skillCards.begin() + index);
+    return c;
+}
+
+const std::vector<Effect*>& Player::getActiveEffects() const {
+    return activeEffects;
+}
+
+void Player::addEffect(Effect* effect) {
+    activeEffects.push_back(effect);
+}
+
+void Player::tickEffects() {
+    for (auto* e : activeEffects)
+        if (e) e->tick();
+
+    activeEffects.erase(
+        std::remove_if(activeEffects.begin(), activeEffects.end(),
+            [](Effect* e) { return e && e->isExpired(); }),
+        activeEffects.end());
+}
+
+Money Player::applyOutgoingModifiers(const Money& amount) const {
+    Money result = amount;
+    for (auto* e : activeEffects)
+        if (e) result = e->modifyOutgoingPayment(result);
+    return result;
+}
+
+Money Player::applyIncomingModifiers(const Money& amount, PropertyTile* prop) const {
+    Money result = amount;
+    for (auto* e : activeEffects)
+        if (e) result = e->modifyRent(result, prop);
+    return result;
+}
+
+bool Player::isPaymentBlocked() const {
+    for (auto* e : activeEffects)
+        if (e && e->blockPayment()) {
+            return true;
+        }
+    return false;
+}
+
+PlayerController* Player::getController() const {
+    return controller;
+}
+
+Money Player::getTotalWealth() const {
+    return money;
+}
+
+bool Player::getHasUsedSkillCardThisTurn() const {
+    return hasUsedSkillCardThisTurn;
+}
+
+bool Player::getHasRolledDiceThisTurn() const {
+    return hasRolledDiceThisTurn;
+}
+
+void Player::setHasUsedSkillCardThisTurn(bool v) {
+    hasUsedSkillCardThisTurn = v;
+}
+
+void Player::setHasRolledDiceThisTurn(bool v) {
+    hasRolledDiceThisTurn = v;
+}
+
+void Player::resetTurnFlags() {
+    hasUsedSkillCardThisTurn = false;
+    hasRolledDiceThisTurn = false;
+}
+
+int Player::getJailTurnsRemaining() const {
+    return jailTurnsRemaining;
+}
+
+void Player::incrementJailTurn() {
+    ++jailTurnsRemaining;
+}
+
+void Player::resetJailTurns() {
+    jailTurnsRemaining = 0;
+}
+
+int Player::getConsecutiveDoubles() const {
+    return consecutiveDoubles;
+}
+
+void Player::setConsecutiveDoubles(int n) {
+    consecutiveDoubles = n;
+}
+
+int Player::getTurnCount() const {
+    return turnCount;
+}
+
+void Player::incrementTurnCount() {
+    ++turnCount;
+}
+
+bool Player::operator<(const Player& other) const {
+    return money < other.money;
+}
+
+bool Player::operator>(const Player& other) const {
+    return money > other.money;
+}
