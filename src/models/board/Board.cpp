@@ -11,6 +11,12 @@ void Board::addTile(std::unique_ptr<Tile> tile) {
 	tiles.push_back(std::move(tile));
 }
 
+void Board::clear() {
+	tiles.clear();
+	colorGroups.clear();
+	ownedColorGroups.clear();
+}
+
 Tile* Board::getTile(int index) const {
 	if (index < 0 || index >= static_cast<int>(tiles.size()))
 		return nullptr;
@@ -52,6 +58,17 @@ PropertyTile* Board::getPropertyByCode(const std::string& code) const {
 
 void Board::registerColorGroup(ColorGroup* group) {
 	colorGroups.push_back(group);
+}
+
+ColorGroup* Board::ensureColorGroup(Color color) {
+	if (ColorGroup* existing = getColorGroup(color)) {
+		return existing;
+	}
+
+	ownedColorGroups.push_back(std::make_unique<ColorGroup>(color));
+	ColorGroup* group = ownedColorGroups.back().get();
+	registerColorGroup(group);
+	return group;
 }
 
 ColorGroup* Board::getColorGroup(Color color) const {
