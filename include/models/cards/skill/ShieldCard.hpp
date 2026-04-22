@@ -11,6 +11,7 @@ class ShieldCard : public SkillCard {
 
         CardResult activate(Player& player, GameContext& context) override;
         SkillCardType getCardType() const override;
+        std::string getSaveDuration() const override;
         std::string getId() const override;
         int getDuration() const;
 
