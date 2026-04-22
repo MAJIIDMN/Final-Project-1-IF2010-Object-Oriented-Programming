@@ -1,14 +1,12 @@
-#ifndef SPECIAL_TILE_HPP
-#define SPECIAL_TILE_HPP
+#ifndef TILE_HEADER_SPECIAL_TILE_HPP
+#define TILE_HEADER_SPECIAL_TILE_HPP
 
-#include "Tile.hpp"
+#include "tile/header/Tile.hpp"
+#include "utils/Enums.hpp"
 
 class SpecialTile : public Tile {
 public:
-
-private:
-
-protected:
+	SpecialTile(int id, const std::string& code, const std::string& name, TileType type);
 };
 
 #endif

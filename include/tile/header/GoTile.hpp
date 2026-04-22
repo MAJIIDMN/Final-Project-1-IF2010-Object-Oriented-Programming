@@ -1,14 +1,17 @@
-#ifndef GO_TILE_HPP
-#define GO_TILE_HPP
+#ifndef TILE_HEADER_GO_TILE_HPP
+#define TILE_HEADER_GO_TILE_HPP
 
-#include "SpecialTile.hpp"
+#include "tile/header/SpecialTile.hpp"
+#include "utils/Enums.hpp"
 
 class GoTile : public SpecialTile {
 public:
+	GoTile(int id, const std::string& code, const std::string& name, int salary);
+
+	int getSalary() const;
 
 private:
-
-protected:
+	int salary;
 };
 
 #endif

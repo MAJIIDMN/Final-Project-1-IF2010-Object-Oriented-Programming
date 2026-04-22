@@ -1,14 +1,12 @@
-#ifndef FREE_PARKING_TILE_HPP
-#define FREE_PARKING_TILE_HPP
+#ifndef TILE_HEADER_FREE_PARKING_TILE_HPP
+#define TILE_HEADER_FREE_PARKING_TILE_HPP
 
-#include "SpecialTile.hpp"
+#include "tile/header/SpecialTile.hpp"
+#include "utils/Enums.hpp"
 
 class FreeParkingTile : public SpecialTile {
 public:
-
-private:
-
-protected:
+	FreeParkingTile(int id, const std::string& code, const std::string& name);
 };
 
 #endif
