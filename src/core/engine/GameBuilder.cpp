@@ -16,7 +16,9 @@ GameBuilder& GameBuilder::withConfig(const GameConfig& value) {
 
 GameEngine GameBuilder::build() {
 	gameState.setPhase(GamePhase::SETUP);
-	return GameEngine(gameState);
+	GameEngine engine(gameState);
+	engine.initialize(gameState.getPlayers(), gameConfig.getMaxTurns());
+	return engine;
 }
 
 Board* GameBuilder::getBoard() const {
