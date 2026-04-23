@@ -679,11 +679,59 @@ void GUIView::renderPromptOverlay(const GUIPromptState& prompt) {
     dim.setFillColor(sf::Color(0, 0, 0, 160));
     rw.draw(dim);
 
+    // Property card overlay (if buy prompt is active)
+    float panelYOffset = 0.f;
+    if (buyPromptActive_ && prompt.type == GUIPromptType::YES_NO) {
+        const float cardW = W * 0.30f;
+        const float cardH = H * 0.22f;
+        const float cardY = cy - H * 0.22f;
+        panelYOffset = cardH * 0.5f + 20.f;
+
+        sf::RectangleShape card({cardW, cardH});
+        card.setPosition({cx - cardW * 0.5f, cardY - cardH * 0.5f});
+        card.setFillColor(sf::Color(250, 250, 248));
+        card.setOutlineThickness(2.f);
+        card.setOutlineColor(sf::Color(60, 90, 140));
+        rw.draw(card);
+
+        unsigned csz = static_cast<unsigned>(cardH * 0.13f);
+        sf::Text code(am.font("bold"), buyPromptInfo_.code, csz);
+        code.setFillColor(sf::Color(35, 55, 90));
+        auto cb = code.getLocalBounds();
+        code.setOrigin({cb.position.x + cb.size.x * 0.5f, cb.position.y});
+        code.setPosition({cx, cardY - cardH * 0.32f});
+        rw.draw(code);
+
+        unsigned nsz = static_cast<unsigned>(cardH * 0.10f);
+        sf::Text name(am.font("regular"), buyPromptInfo_.name, nsz);
+        name.setFillColor(sf::Color(80, 100, 130));
+        auto nb = name.getLocalBounds();
+        name.setOrigin({nb.position.x + nb.size.x * 0.5f, nb.position.y});
+        name.setPosition({cx, cardY - cardH * 0.12f});
+        rw.draw(name);
+
+        std::string priceStr = "Harga: " + buyPromptInfo_.purchasePrice.toString();
+        sf::Text price(am.font("regular"), priceStr, nsz);
+        price.setFillColor(sf::Color(20, 110, 70));
+        auto pb = price.getLocalBounds();
+        price.setOrigin({pb.position.x + pb.size.x * 0.5f, pb.position.y});
+        price.setPosition({cx, cardY + cardH * 0.08f});
+        rw.draw(price);
+
+        std::string moneyStr = "Uangmu: " + buyPromptMoney_.toString();
+        sf::Text money(am.font("regular"), moneyStr, nsz);
+        money.setFillColor(sf::Color(100, 100, 120));
+        auto mb = money.getLocalBounds();
+        money.setOrigin({mb.position.x + mb.size.x * 0.5f, mb.position.y});
+        money.setPosition({cx, cardY + cardH * 0.24f});
+        rw.draw(money);
+    }
+
     // Panel
     const float panelW = W * 0.42f;
     const float panelH = H * 0.28f;
     sf::RectangleShape panel({panelW, panelH});
-    panel.setPosition({cx - panelW * 0.5f, cy - panelH * 0.5f});
+    panel.setPosition({cx - panelW * 0.5f, cy - panelH * 0.5f + panelYOffset});
     panel.setFillColor(sf::Color(250, 250, 252));
     panel.setOutlineThickness(2.f);
     panel.setOutlineColor(sf::Color(80, 130, 200));
@@ -698,11 +746,11 @@ void GUIView::renderPromptOverlay(const GUIPromptState& prompt) {
     title.setFillColor(sf::Color(35, 55, 90));
     auto tb = title.getLocalBounds();
     title.setOrigin({tb.position.x + tb.size.x * 0.5f, tb.position.y});
-    title.setPosition({cx, cy - panelH * 0.30f});
+    title.setPosition({cx, cy - panelH * 0.30f + panelYOffset});
     rw.draw(title);
 
     // Type-specific content
-    float contentY = cy - panelH * 0.08f;
+    float contentY = cy - panelH * 0.08f + panelYOffset;
 
     if (prompt.type == GUIPromptType::MENU_CHOICE) {
         float optY = contentY;
@@ -744,8 +792,12 @@ void GUIView::renderPromptOverlay(const GUIPromptState& prompt) {
     buffer.setFillColor(sf::Color(40, 60, 100));
     auto bb = buffer.getLocalBounds();
     buffer.setOrigin({bb.position.x + bb.size.x * 0.5f, bb.position.y});
-    buffer.setPosition({cx, cy + panelH * 0.22f});
+    buffer.setPosition({cx, cy + panelH * 0.22f + panelYOffset});
     rw.draw(buffer);
+
+    if (prompt.resolved) {
+        buyPromptActive_ = false;
+    }
 #endif
 }
 

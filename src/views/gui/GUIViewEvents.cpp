@@ -20,8 +20,9 @@ void GUIView::showPlayerProperties(const vector<PropertyInfo>& list) {
 }
 
 void GUIView::showBuyPrompt(const PropertyInfo& propertyInfo, Money playerMoney) {
-    (void)propertyInfo;
-    (void)playerMoney;
+    buyPromptInfo_ = propertyInfo;
+    buyPromptMoney_ = playerMoney;
+    buyPromptActive_ = true;
 }
 
 void GUIView::showRentPayment(const RentInfo& rentInfo) {

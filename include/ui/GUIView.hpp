@@ -98,6 +98,11 @@ private:
     int diceAnimFace2_{1};
     static constexpr float DICE_ANIM_DURATION = 1.2f;
 
+    // Property buy prompt state
+    PropertyInfo buyPromptInfo_;
+    Money buyPromptMoney_{0};
+    bool buyPromptActive_{false};
+
     void drawLeftPanel (sf::RenderWindow& rw, const GameStateView& state);
     void drawRightPanel(sf::RenderWindow& rw, const GameStateView& state);
     void drawBottomStrip(sf::RenderWindow& rw, const GameStateView& state);
@@ -105,4 +110,5 @@ private:
     void drawDiceAnimation(sf::RenderWindow& rw, float dt);
     void drawDieFace(sf::RenderWindow& rw, float cx, float cy, float size, int face,
                      unsigned fillRGB, unsigned dotRGB);
+    void drawPropertyCardOverlay(sf::RenderWindow& rw);
 };
