@@ -3,6 +3,7 @@
 #if NIMONSPOLY_ENABLE_SFML
 #include <algorithm>
 #include <array>
+#include <sstream>
 
 namespace gui::draw {
 
@@ -235,6 +236,31 @@ void drawLabel(sf::RenderWindow& rw, AssetManager& am,
     t.setOrigin({b.position.x, b.position.y});
     t.setPosition(pos);
     rw.draw(t);
+}
+
+std::vector<std::string> wrapText(AssetManager& am,
+                                  const std::string& fontKey,
+                                  const std::string& text,
+                                  unsigned charSize,
+                                  float maxWidth) {
+    std::vector<std::string> lines;
+    std::string currentLine;
+    std::istringstream iss(text);
+    std::string word;
+    sf::Text measure(am.font(fontKey), "", charSize);
+
+    while (iss >> word) {
+        std::string test = currentLine.empty() ? word : currentLine + " " + word;
+        measure.setString(test);
+        if (measure.getLocalBounds().size.x > maxWidth && !currentLine.empty()) {
+            lines.push_back(currentLine);
+            currentLine = word;
+        } else {
+            currentLine = test;
+        }
+    }
+    if (!currentLine.empty()) lines.push_back(currentLine);
+    return lines;
 }
 
 void drawPanel(sf::RenderWindow& rw, sf::FloatRect rect, sf::Color fill) {

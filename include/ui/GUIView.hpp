@@ -1,6 +1,7 @@
 #pragma once
 
 #include "ui/AppScreen.hpp"
+#include "ui/GUIInput.hpp"
 #include "ui/IGameView.hpp"
 #include "utils/Types.hpp"
 
@@ -14,10 +15,13 @@ public:
     explicit GUIView(sf::RenderWindow& window);
 
     AppScreen  screen() const { return screen_; }
+    void       setScreen(AppScreen s) { screen_ = s; }
     SetupState& setup()       { return setup_; }
 
     bool handleMenuEvent(const sf::Event& event);
     void renderCurrentScreen();
+
+    void handleInGameClick(float mx, float my, std::string& outCommand, const GameStateView& state);
 
     void drawLandingPage();
     void drawNumPlayers();
@@ -70,6 +74,9 @@ public:
     void showSaveLoadStatus(const string& message) override;
     void showMessage(const string& message) override;
 
+    void renderPromptOverlay(const struct GUIPromptState& prompt);
+    void setCurrentPrompt(const GUIPromptState* p) { currentPrompt_ = p; }
+
 private:
     [[maybe_unused]] sf::RenderWindow* window;
     AppScreen  screen_{AppScreen::LANDING};
@@ -79,10 +86,12 @@ private:
 
     vector<LogEntry> log_;
     int  lastD1_{0}, lastD2_{0};
-    bool diceRolled_{false};
     [[maybe_unused]] int logScrollOffset_{0};
+    const GUIPromptState* currentPrompt_{nullptr};
+    WinnerInfo winnerInfo_;
 
     void drawLeftPanel (sf::RenderWindow& rw, const GameStateView& state);
     void drawRightPanel(sf::RenderWindow& rw, const GameStateView& state);
     void drawBottomStrip(sf::RenderWindow& rw, const GameStateView& state);
+    void drawGameOver();
 };
