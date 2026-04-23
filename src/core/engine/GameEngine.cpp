@@ -1121,7 +1121,7 @@ bool GameEngine::auctionProperty(PropertyTile& property, Player& trigger) {
 		if (PlayerController* controller = bidder->getController()) {
 			decision = controller->decideAuction(highestBid, bidder->getMoney());
 		}
-		if (action == AuctionAction::BID) {
+		if (decision.action == AuctionAction::BID) {
 			int bid = highestBid + 1;
 			std::cout << "Bid untuk " << bidder->getUsername() << " (mis. lelang 500): ";
 			std::string cmd;
