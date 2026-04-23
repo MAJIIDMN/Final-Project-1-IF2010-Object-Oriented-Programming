@@ -190,8 +190,13 @@ int main() {
             if (!active || active->isBankrupt()) {
                 engine.processCommand("SELESAI", *active);
             } else if (!pendingCommand.empty()) {
-                engine.processCommand(pendingCommand, *active);
-                pendingCommand.clear();
+                // Delay DADU command until dice animation finishes
+                if (pendingCommand == "DADU" && view.isDiceAnimating()) {
+                    // wait for animation
+                } else {
+                    engine.processCommand(pendingCommand, *active);
+                    pendingCommand.clear();
+                }
             }
 
             state.refresh(engine.getState());

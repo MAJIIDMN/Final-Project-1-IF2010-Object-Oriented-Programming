@@ -76,6 +76,7 @@ public:
 
     void renderPromptOverlay(const struct GUIPromptState& prompt);
     void setCurrentPrompt(const GUIPromptState* p) { currentPrompt_ = p; }
+    bool isDiceAnimating() const { return diceAnimating_; }
 
 private:
     [[maybe_unused]] sf::RenderWindow* window;
@@ -90,8 +91,18 @@ private:
     const GUIPromptState* currentPrompt_{nullptr};
     WinnerInfo winnerInfo_;
 
+    // Dice animation state
+    bool diceAnimating_{false};
+    float diceAnimElapsed_{0.f};
+    int diceAnimFace1_{1};
+    int diceAnimFace2_{1};
+    static constexpr float DICE_ANIM_DURATION = 1.2f;
+
     void drawLeftPanel (sf::RenderWindow& rw, const GameStateView& state);
     void drawRightPanel(sf::RenderWindow& rw, const GameStateView& state);
     void drawBottomStrip(sf::RenderWindow& rw, const GameStateView& state);
     void drawGameOver();
+    void drawDiceAnimation(sf::RenderWindow& rw, float dt);
+    void drawDieFace(sf::RenderWindow& rw, float cx, float cy, float size, int face,
+                     unsigned fillRGB, unsigned dotRGB);
 };

@@ -8,6 +8,7 @@
 
 #include <algorithm>
 #include <array>
+#include <random>
 #include <string>
 #include <vector>
 
@@ -20,13 +21,13 @@
 
 #if NIMONSPOLY_ENABLE_SFML
 // Fixed layout constants for in-game screen (window 1440x1024)
-static constexpr float LAYOUT_PAD = 2.f;      // spacing for globe / board area
+static constexpr float LAYOUT_PAD = 8.f;      // spacing for globe / board area
 static constexpr float SECTION_PAD = 2.f;     // compact margin for section cards
-static constexpr float SQUARE_CARD_W = 360.f;
-static constexpr float SQUARE_CARD_H = 358.f;
-static constexpr float RECT_CARD_W = 1100.f;
-static constexpr float RECT_CARD_H = 180.f;
-static constexpr float GLOBE_SIZE = 700.f;
+static constexpr float SQUARE_CARD_W = 300.f;
+static constexpr float SQUARE_CARD_H = 380.f;
+static constexpr float RECT_CARD_W = 1000.f;
+static constexpr float RECT_CARD_H = 250.f;
+static constexpr float GLOBE_SIZE = 520.f;
 #endif
 
 void GUIView::showBoard(const GameStateView& state) {
@@ -54,9 +55,7 @@ void GUIView::showBoard(const GameStateView& state) {
     const float cW = boardRight - boardLeft;
     const float cH = boardBottom - boardTop;
 
-    // const float boardSz = std::min(cW, cH) * 0.97f;
-    // const float boardSz = std::min(cW, cH) * 1.f;
-    const float boardSz = 700.f;
+    const float boardSz = std::min(cW, cH) * 0.97f;
     const sf::Vector2f origin{
         boardLeft + (cW - boardSz) * 0.5f,
         boardTop + (cH - boardSz) * 0.5f,
@@ -139,142 +138,10 @@ void GUIView::showBoard(const GameStateView& state) {
 
     rw.display();
 #else
-    (void)rw; (void)state;
+    (void)state;
 #endif
 }
 
-void GUIView::renderPromptOverlay(const GUIPromptState& prompt) {
-#if NIMONSPOLY_ENABLE_SFML
-    if (!window) return;
-    sf::RenderWindow& rw = *window;
-    AssetManager& am = AssetManager::get();
-
-    const float W = static_cast<float>(rw.getSize().x);
-    const float H = static_cast<float>(rw.getSize().y);
-    const float cx = W * 0.5f;
-    const float cy = H * 0.5f;
-
-    // Dim background
-    sf::RectangleShape dim({W, H});
-    dim.setFillColor(sf::Color(0, 0, 0, 160));
-    rw.draw(dim);
-
-    // Panel
-    const float panelW = W * 0.42f;
-    const float panelH = H * 0.28f;
-    sf::RectangleShape panel({panelW, panelH});
-    panel.setPosition({cx - panelW * 0.5f, cy - panelH * 0.5f});
-    panel.setFillColor(sf::Color(250, 250, 252));
-    panel.setOutlineThickness(2.f);
-    panel.setOutlineColor(sf::Color(80, 130, 200));
-    rw.draw(panel);
-
-    unsigned titleSz = static_cast<unsigned>(panelH * 0.13f);
-    unsigned bodySz  = static_cast<unsigned>(panelH * 0.10f);
-    unsigned hintSz  = static_cast<unsigned>(panelH * 0.07f);
-
-    // Title / label
-    sf::Text title(am.font("bold"), prompt.label, titleSz);
-    title.setFillColor(sf::Color(35, 55, 90));
-    auto tb = title.getLocalBounds();
-    title.setOrigin({tb.position.x + tb.size.x * 0.5f, tb.position.y});
-    title.setPosition({cx, cy - panelH * 0.30f});
-    rw.draw(title);
-
-    // Type-specific content
-    float contentY = cy - panelH * 0.08f;
-
-    if (prompt.type == GUIPromptType::MENU_CHOICE) {
-        float optY = contentY;
-        for (int i = 0; i < static_cast<int>(prompt.options.size()); ++i) {
-            std::string line = std::to_string(i) + ". " + prompt.options[static_cast<size_t>(i)];
-            sf::Text opt(am.font("regular"), line, bodySz);
-            opt.setFillColor(sf::Color(60, 80, 120));
-            auto ob = opt.getLocalBounds();
-            opt.setOrigin({ob.position.x + ob.size.x * 0.5f, ob.position.y});
-            opt.setPosition({cx, optY});
-            rw.draw(opt);
-            optY += bodySz * 1.4f;
-        }
-    } else if (prompt.type == GUIPromptType::YES_NO) {
-        sf::Text hint(am.font("regular"), "Ketik Y / N lalu Enter", hintSz);
-        hint.setFillColor(sf::Color(120, 140, 170));
-        auto hb = hint.getLocalBounds();
-        hint.setOrigin({hb.position.x + hb.size.x * 0.5f, hb.position.y});
-        hint.setPosition({cx, contentY});
-        rw.draw(hint);
-    } else if (prompt.type == GUIPromptType::AUCTION) {
-        sf::Text hint(am.font("regular"), "Ketik PASS atau BID <jumlah>", hintSz);
-        hint.setFillColor(sf::Color(120, 140, 170));
-        auto hb = hint.getLocalBounds();
-        hint.setOrigin({hb.position.x + hb.size.x * 0.5f, hb.position.y});
-        hint.setPosition({cx, contentY});
-        rw.draw(hint);
-    } else {
-        sf::Text hint(am.font("regular"), "Ketik jawaban lalu Enter", hintSz);
-        hint.setFillColor(sf::Color(120, 140, 170));
-        auto hb = hint.getLocalBounds();
-        hint.setOrigin({hb.position.x + hb.size.x * 0.5f, hb.position.y});
-        hint.setPosition({cx, contentY});
-        rw.draw(hint);
-    }
-
-    // Text input buffer
-    sf::Text buffer(am.font("regular"), "> " + prompt.textBuffer + "_", bodySz);
-    buffer.setFillColor(sf::Color(40, 60, 100));
-    auto bb = buffer.getLocalBounds();
-    buffer.setOrigin({bb.position.x + bb.size.x * 0.5f, bb.position.y});
-    buffer.setPosition({cx, cy + panelH * 0.22f});
-    rw.draw(buffer);
-#endif
-}
-
-void GUIView::handleInGameClick(float mx, float my, std::string& outCommand, const GameStateView& state) {
-#if NIMONSPOLY_ENABLE_SFML
-    if (!window) return;
-    const float W = static_cast<float>(window->getSize().x);
-    const float H = static_cast<float>(window->getSize().y);
-
-    const float rpX = W - SECTION_PAD - SQUARE_CARD_W;
-    const float colW = SQUARE_CARD_W;
-
-    // Calculate button positions (same as drawRightPanel)
-    float y = SECTION_PAD + SQUARE_CARD_H + SECTION_PAD;
-
-    // Action buttons: Buy, Build, Mortgage, Card
-    float btnSz = std::min(colW * 0.46f, (H - y - SECTION_PAD - 100.f) / 2.5f);
-    float gap = btnSz * 0.18f;
-    float gridW = btnSz * 2.f + gap;
-    float startX = rpX + (colW - gridW) * 0.5f + btnSz * 0.5f;
-    float startY = y + btnSz * 0.5f;
-
-    const char* actions[] = {"BELI", "BANGUN", "GADAI", "KARTU"};
-    for (int i = 0; i < 4; ++i) {
-        int col = i % 2;
-        int row = i / 2;
-        float bx = startX + col * (btnSz + gap);
-        float by = startY + row * (btnSz + gap);
-        float half = btnSz * 0.5f;
-        if (mx >= bx - half && mx <= bx + half &&
-            my >= by - half && my <= by + half) {
-            outCommand = actions[i];
-            return;
-        }
-    }
-
-    // "Lempar Dadu" button
-    float btnW = colW;
-    float btnH = std::min(H * 0.14f, 100.f);
-    float bx = rpX + colW * 0.5f;
-    float by = H - SECTION_PAD - btnH * 0.5f;
-    if (mx >= bx - btnW * 0.5f && mx <= bx + btnW * 0.5f &&
-        my >= by - btnH * 0.5f && my <= by + btnH * 0.5f) {
-        if (!state.hasRolledDice) {
-            outCommand = "DADU";
-        }
-    }
-#endif
-}
 void GUIView::drawLeftPanel(sf::RenderWindow& rw, const GameStateView& state) {
 #if NIMONSPOLY_ENABLE_SFML
     AssetManager& am = AssetManager::get();
@@ -528,7 +395,7 @@ void GUIView::drawRightPanel(sf::RenderWindow& rw, const GameStateView& state) {
         float btnW = colW;
         float btnH = std::min(H * 0.14f, 100.f);
         float bx   = rpX + colW * 0.5f;
-        float by   = H - LAYOUT_PAD - btnH * 0.5f;
+        float by   = H - SECTION_PAD - btnH * 0.5f;
         bool disabled = state.hasRolledDice;
 
         const sf::Texture* rectBtnTex = am.texture("assets/components/btn/EmptyRectBtn.png");
@@ -673,7 +540,260 @@ void GUIView::drawBottomStrip(sf::RenderWindow& rw, const GameStateView& state) 
 
         cx += cardW + cardGap;
     }
+
+    // Dice animation overlay (rendered on top of board area)
+    if (diceAnimating_) {
+        drawDiceAnimation(rw, 0.016f); // assume ~60fps dt
+    }
+
+    // Show final dice result briefly after roll
+    if (!diceAnimating_ && (lastD1_ > 0 || lastD2_ > 0)) {
+        const float W = static_cast<float>(rw.getSize().x);
+        const float H = static_cast<float>(rw.getSize().y);
+        const float dieSz = 70.f;
+        const float gap = 20.f;
+        const float totalW = dieSz * 2.f + gap;
+        sf::Vector2f center{W * 0.5f, H * 0.5f};
+        drawDieFace(rw, center.x - totalW * 0.5f + dieSz * 0.5f, center.y, dieSz, lastD1_,
+                    0xFAFAF8, 0x282832);
+        drawDieFace(rw, center.x + totalW * 0.5f - dieSz * 0.5f, center.y, dieSz, lastD2_,
+                    0xFAFAF8, 0x282832);
+    }
 #else
     (void)rw; (void)state;
+#endif
+}
+
+void GUIView::drawDieFace(sf::RenderWindow& rw, float cx, float cy, float size, int face,
+                          unsigned fillRGB, unsigned dotRGB) {
+#if NIMONSPOLY_ENABLE_SFML
+    float half = size * 0.5f;
+    float radius = size * 0.08f;
+    float offset = size * 0.28f;
+
+    auto toColor = [](unsigned rgb) -> sf::Color {
+        return sf::Color(static_cast<uint8_t>((rgb >> 16) & 0xFF),
+                         static_cast<uint8_t>((rgb >> 8) & 0xFF),
+                         static_cast<uint8_t>(rgb & 0xFF));
+    };
+    sf::Color fill = toColor(fillRGB);
+    sf::Color dot = toColor(dotRGB);
+
+    sf::RectangleShape bg({size, size});
+    bg.setOrigin({half, half});
+    bg.setPosition({cx, cy});
+    bg.setFillColor(fill);
+    bg.setOutlineThickness(2.f);
+    bg.setOutlineColor(sf::Color(80, 90, 110));
+    rw.draw(bg);
+
+    auto drawDot = [&](float dx, float dy) {
+        sf::CircleShape d(radius);
+        d.setFillColor(dot);
+        d.setOrigin({radius, radius});
+        d.setPosition({cx + dx, cy + dy});
+        rw.draw(d);
+    };
+
+    if (face == 1) {
+        drawDot(0, 0);
+    } else if (face == 2) {
+        drawDot(-offset, -offset);
+        drawDot(offset, offset);
+    } else if (face == 3) {
+        drawDot(-offset, -offset);
+        drawDot(0, 0);
+        drawDot(offset, offset);
+    } else if (face == 4) {
+        drawDot(-offset, -offset);
+        drawDot(offset, -offset);
+        drawDot(-offset, offset);
+        drawDot(offset, offset);
+    } else if (face == 5) {
+        drawDot(-offset, -offset);
+        drawDot(offset, -offset);
+        drawDot(0, 0);
+        drawDot(-offset, offset);
+        drawDot(offset, offset);
+    } else if (face == 6) {
+        drawDot(-offset, -offset);
+        drawDot(offset, -offset);
+        drawDot(-offset, 0);
+        drawDot(offset, 0);
+        drawDot(-offset, offset);
+        drawDot(offset, offset);
+    }
+#endif
+}
+
+void GUIView::drawDiceAnimation(sf::RenderWindow& rw, float dt) {
+#if NIMONSPOLY_ENABLE_SFML
+    diceAnimElapsed_ += dt;
+
+    if (diceAnimElapsed_ >= DICE_ANIM_DURATION) {
+        diceAnimating_ = false;
+        diceAnimElapsed_ = 0.f;
+        return;
+    }
+
+    const float W = static_cast<float>(rw.getSize().x);
+    const float H = static_cast<float>(rw.getSize().y);
+    const float dieSz = 90.f;
+    const float gap = 30.f;
+    const float totalW = dieSz * 2.f + gap;
+    sf::Vector2f center{W * 0.5f, H * 0.5f};
+
+    // Semi-transparent backdrop
+    sf::RectangleShape dim({W, H});
+    dim.setFillColor(sf::Color(0, 0, 0, 80));
+    rw.draw(dim);
+
+    // Cycle random faces during animation
+    static std::mt19937 rng(static_cast<unsigned>(std::random_device{}()));
+    std::uniform_int_distribution<int> dist(1, 6);
+    if (static_cast<int>(diceAnimElapsed_ * 10) % 2 == 0) {
+        diceAnimFace1_ = dist(rng);
+        diceAnimFace2_ = dist(rng);
+    }
+
+    drawDieFace(rw, center.x - totalW * 0.5f + dieSz * 0.5f, center.y, dieSz, diceAnimFace1_,
+                0xFAFAF8, 0x282832);
+    drawDieFace(rw, center.x + totalW * 0.5f - dieSz * 0.5f, center.y, dieSz, diceAnimFace2_,
+                0xFAFAF8, 0x282832);
+#endif
+}
+
+void GUIView::renderPromptOverlay(const GUIPromptState& prompt) {
+#if NIMONSPOLY_ENABLE_SFML
+    if (!window) return;
+    sf::RenderWindow& rw = *window;
+    AssetManager& am = AssetManager::get();
+
+    const float W = static_cast<float>(rw.getSize().x);
+    const float H = static_cast<float>(rw.getSize().y);
+    const float cx = W * 0.5f;
+    const float cy = H * 0.5f;
+
+    // Dim background
+    sf::RectangleShape dim({W, H});
+    dim.setFillColor(sf::Color(0, 0, 0, 160));
+    rw.draw(dim);
+
+    // Panel
+    const float panelW = W * 0.42f;
+    const float panelH = H * 0.28f;
+    sf::RectangleShape panel({panelW, panelH});
+    panel.setPosition({cx - panelW * 0.5f, cy - panelH * 0.5f});
+    panel.setFillColor(sf::Color(250, 250, 252));
+    panel.setOutlineThickness(2.f);
+    panel.setOutlineColor(sf::Color(80, 130, 200));
+    rw.draw(panel);
+
+    unsigned titleSz = static_cast<unsigned>(panelH * 0.13f);
+    unsigned bodySz  = static_cast<unsigned>(panelH * 0.10f);
+    unsigned hintSz  = static_cast<unsigned>(panelH * 0.07f);
+
+    // Title / label
+    sf::Text title(am.font("bold"), prompt.label, titleSz);
+    title.setFillColor(sf::Color(35, 55, 90));
+    auto tb = title.getLocalBounds();
+    title.setOrigin({tb.position.x + tb.size.x * 0.5f, tb.position.y});
+    title.setPosition({cx, cy - panelH * 0.30f});
+    rw.draw(title);
+
+    // Type-specific content
+    float contentY = cy - panelH * 0.08f;
+
+    if (prompt.type == GUIPromptType::MENU_CHOICE) {
+        float optY = contentY;
+        for (int i = 0; i < static_cast<int>(prompt.options.size()); ++i) {
+            std::string line = std::to_string(i) + ". " + prompt.options[static_cast<size_t>(i)];
+            sf::Text opt(am.font("regular"), line, bodySz);
+            opt.setFillColor(sf::Color(60, 80, 120));
+            auto ob = opt.getLocalBounds();
+            opt.setOrigin({ob.position.x + ob.size.x * 0.5f, ob.position.y});
+            opt.setPosition({cx, optY});
+            rw.draw(opt);
+            optY += bodySz * 1.4f;
+        }
+    } else if (prompt.type == GUIPromptType::YES_NO) {
+        sf::Text hint(am.font("regular"), "Ketik Y / N lalu Enter", hintSz);
+        hint.setFillColor(sf::Color(120, 140, 170));
+        auto hb = hint.getLocalBounds();
+        hint.setOrigin({hb.position.x + hb.size.x * 0.5f, hb.position.y});
+        hint.setPosition({cx, contentY});
+        rw.draw(hint);
+    } else if (prompt.type == GUIPromptType::AUCTION) {
+        sf::Text hint(am.font("regular"), "Ketik PASS atau BID <jumlah>", hintSz);
+        hint.setFillColor(sf::Color(120, 140, 170));
+        auto hb = hint.getLocalBounds();
+        hint.setOrigin({hb.position.x + hb.size.x * 0.5f, hb.position.y});
+        hint.setPosition({cx, contentY});
+        rw.draw(hint);
+    } else {
+        sf::Text hint(am.font("regular"), "Ketik jawaban lalu Enter", hintSz);
+        hint.setFillColor(sf::Color(120, 140, 170));
+        auto hb = hint.getLocalBounds();
+        hint.setOrigin({hb.position.x + hb.size.x * 0.5f, hb.position.y});
+        hint.setPosition({cx, contentY});
+        rw.draw(hint);
+    }
+
+    // Text input buffer
+    sf::Text buffer(am.font("regular"), "> " + prompt.textBuffer + "_", bodySz);
+    buffer.setFillColor(sf::Color(40, 60, 100));
+    auto bb = buffer.getLocalBounds();
+    buffer.setOrigin({bb.position.x + bb.size.x * 0.5f, bb.position.y});
+    buffer.setPosition({cx, cy + panelH * 0.22f});
+    rw.draw(buffer);
+#endif
+}
+
+void GUIView::handleInGameClick(float mx, float my, std::string& outCommand, const GameStateView& state) {
+#if NIMONSPOLY_ENABLE_SFML
+    if (!window) return;
+    const float W = static_cast<float>(window->getSize().x);
+    const float H = static_cast<float>(window->getSize().y);
+
+    const float rpX = W - SECTION_PAD - SQUARE_CARD_W;
+    const float colW = SQUARE_CARD_W;
+
+    // Calculate button positions (same as drawRightPanel)
+    float y = SECTION_PAD + SQUARE_CARD_H + SECTION_PAD;
+
+    // Action buttons: Buy, Build, Mortgage, Card
+    float btnSz = std::min(colW * 0.46f, (H - y - SECTION_PAD - 100.f) / 2.5f);
+    float gap = btnSz * 0.18f;
+    float gridW = btnSz * 2.f + gap;
+    float startX = rpX + (colW - gridW) * 0.5f + btnSz * 0.5f;
+    float startY = y + btnSz * 0.5f;
+
+    const char* actions[] = {"BELI", "BANGUN", "GADAI", "KARTU"};
+    for (int i = 0; i < 4; ++i) {
+        int col = i % 2;
+        int row = i / 2;
+        float bx = startX + col * (btnSz + gap);
+        float by = startY + row * (btnSz + gap);
+        float half = btnSz * 0.5f;
+        if (mx >= bx - half && mx <= bx + half &&
+            my >= by - half && my <= by + half) {
+            outCommand = actions[i];
+            return;
+        }
+    }
+
+    // "Lempar Dadu" button
+    float btnW = colW;
+    float btnH = std::min(H * 0.14f, 100.f);
+    float bx = rpX + colW * 0.5f;
+    float by = H - SECTION_PAD - btnH * 0.5f;
+    if (mx >= bx - btnW * 0.5f && mx <= bx + btnW * 0.5f &&
+        my >= by - btnH * 0.5f && my <= by + btnH * 0.5f) {
+        if (!state.hasRolledDice && !diceAnimating_) {
+            diceAnimating_ = true;
+            diceAnimElapsed_ = 0.f;
+            outCommand = "DADU";
+        }
+    }
 #endif
 }
