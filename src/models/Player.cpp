@@ -2,6 +2,10 @@
 #include "models/effects/Effect.hpp"
 #include "models/cards/SkillCard.hpp"
 #include "controllers/PlayerController.hpp"
+#include "tile/header/PropertyTile.hpp"
+#include "tile/header/RailroadTile.hpp"
+#include "tile/header/StreetTile.hpp"
+#include "tile/header/UtilityTile.hpp"
 #include "utils/Exceptions.hpp"
 #include <algorithm>
 #include <stdexcept>
@@ -82,22 +86,48 @@ void Player::removeProperty(PropertyTile* tile) {
 }
 
 std::vector<StreetTile*> Player::getPropertiesByColor(Color color) const {
-    (void)color;
-    // Kelas lain belum diimplement
-    return {};
+    std::vector<StreetTile*> result;
+    for (PropertyTile* property : properties) {
+        if (auto* street = dynamic_cast<StreetTile*>(property)) {
+            if (street->getColor() == color) {
+                result.push_back(street);
+            }
+        }
+    }
+    return result;
 }
 
 bool Player::hasMonopoly(Color color) const {
-    (void)color;
-    return false;
+    const std::vector<StreetTile*> owned = getPropertiesByColor(color);
+    if (owned.empty()) {
+        return false;
+    }
+    for (const StreetTile* street : owned) {
+        if (!street->isMonopolyComplete()) {
+            return false;
+        }
+    }
+    return true;
 }
 
 int Player::countRailroads() const {
-    return 0;
+    int count = 0;
+    for (const PropertyTile* property : properties) {
+        if (property && property->getType() == TileType::RAILROAD && !property->isMortgaged()) {
+            ++count;
+        }
+    }
+    return count;
 }
 
 int Player::countUtilities() const {
-    return 0;
+    int count = 0;
+    for (const PropertyTile* property : properties) {
+        if (property && property->getType() == TileType::UTILITY && !property->isMortgaged()) {
+            ++count;
+        }
+    }
+    return count;
 }
 
 const std::vector<SkillCard*>& Player::getSkillCards() const {
@@ -183,7 +213,22 @@ PlayerController* Player::getController() const {
 }
 
 Money Player::getTotalWealth() const {
-    return money;
+    Money total = money;
+    for (const PropertyTile* property : properties) {
+        if (!property) {
+            continue;
+        }
+        total += property->getPrice();
+        if (auto* street = dynamic_cast<const StreetTile*>(property)) {
+            const int level = street->getBuildingLevel();
+            const int houses = std::min(level, 4);
+            total += Money(street->getHouseCost().getAmount() * houses);
+            if (street->hasHotel()) {
+                total += street->getHotelCost();
+            }
+        }
+    }
+    return total;
 }
 
 bool Player::getHasUsedSkillCardThisTurn() const {
@@ -205,6 +250,17 @@ void Player::setHasRolledDiceThisTurn(bool v) {
 void Player::resetTurnFlags() {
     hasUsedSkillCardThisTurn = false;
     hasRolledDiceThisTurn = false;
+}
+
+void Player::clearSkillCardsAndEffects() {
+    skillCards.clear();
+    for (auto& effect : activeEffects) {
+        if (effect) {
+            effect->onEnd(*this);
+        }
+    }
+    activeEffects.clear();
+    properties.clear();
 }
 
 int Player::getJailTurnsRemaining() const {
