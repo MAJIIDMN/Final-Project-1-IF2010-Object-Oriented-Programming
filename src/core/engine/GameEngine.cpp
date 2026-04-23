@@ -1263,7 +1263,7 @@ void GameEngine::handleJailTurn(Player& player) {
 	endTurn(player);
 }
 
-void GameEngine::executeBankruptcy(Player& debtor, Player* creditor, Money /*obligation*/) {
+void GameEngine::executeBankruptcy(Player& debtor, Player* creditor, Money) {
 	if (debtor.isBankrupt()) {
 		return;
 	}
