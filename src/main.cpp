@@ -22,7 +22,7 @@
 
 int main() {
 #if NIMONSPOLY_ENABLE_SFML
-    sf::RenderWindow window(sf::VideoMode(sf::Vector2u{1440u, 900u}), "NIMONSPOLY");
+    sf::RenderWindow window(sf::VideoMode(sf::Vector2u{1440u, 1024u}), "NIMONSPOLY");
     window.setFramerateLimit(60);
 
     AssetManager::get().loadAll();

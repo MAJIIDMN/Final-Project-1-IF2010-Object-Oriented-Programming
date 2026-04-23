@@ -31,13 +31,22 @@ void GUIView::showBoard(const GameStateView& state) {
     const float rpW  = W * RP_W_FRAC;
     const float botH = H * BOT_H_FRAC;
 
-    const float cW = W - lpW - rpW;
-    const float cH = H - botH;
+    // Card section paddings matching drawLeftPanel / drawRightPanel
+    const float leftCardPadX  = lpW * 0.07f;
+    const float rightCardPadX = rpW * 0.08f;
+
+    const float boardLeft   = lpW - leftCardPadX;
+    const float boardRight  = W - rpW + rightCardPadX;
+    const float boardTop    = 0.f;
+    const float boardBottom = H - botH;
+
+    const float cW = boardRight - boardLeft;
+    const float cH = boardBottom - boardTop;
 
     const float boardSz = std::min(cW, cH) * 0.97f;
     const sf::Vector2f origin{
-        lpW + (cW - boardSz) * 0.5f,
-        (cH - boardSz) * 0.5f,
+        boardLeft + (cW - boardSz) * 0.5f,
+        boardTop + (cH - boardSz) * 0.5f,
     };
 
     constexpr int EDGE  = 10;
@@ -169,25 +178,29 @@ void GUIView::drawLeftPanel(sf::RenderWindow& rw, const GameStateView& state) {
     const float sumCardY = colPadY;
     const float plrCardY = sumCardY + sumCardH + gapY;
 
-    const sf::Texture* sumTex = am.texture("assets/components/card/GameSummaryCard.png");
-    const sf::Texture* plrTex = am.texture("assets/components/card/PlayerCard.png");
+    const sf::Texture* sumTex = am.texture("assets/components/card/EmptyCard.png");
+    const sf::Texture* plrTex = am.texture("assets/components/card/EmptyCard.png");
 
     if (sumTex) {
         gui::draw::drawSprite(rw, sumTex, {{colX, sumCardY}, {colW, sumCardH}});
     } else {
         gui::draw::drawPanel(rw, {{colX, sumCardY}, {colW, sumCardH}}, sf::Color(0x17, 0x28, 0x48, 200));
+    }
+    {
         unsigned hSz2 = static_cast<unsigned>(colW * 0.13f);
-        gui::draw::drawLabel(rw, am, "bold", "GAME SUMMARY", hSz2,
-                             sf::Color(160, 200, 240), {colX + pad, sumCardY + pad * 0.6f});
+        gui::draw::drawLabel(rw, am, "title", "GAME SUMMARY", hSz2,
+                             sf::Color(45, 65, 100), {colX + pad, sumCardY + pad * 0.6f});
     }
 
     if (plrTex) {
         gui::draw::drawSprite(rw, plrTex, {{colX, plrCardY}, {colW, plrCardH}});
     } else {
         gui::draw::drawPanel(rw, {{colX, plrCardY}, {colW, plrCardH}}, sf::Color(0x10, 0x1c, 0x38, 230));
+    }
+    {
         unsigned hSz2 = static_cast<unsigned>(colW * 0.13f);
-        gui::draw::drawLabel(rw, am, "bold", "PLAYERS", hSz2,
-                             sf::Color(160, 200, 240), {colX + pad, plrCardY + pad * 0.6f});
+        gui::draw::drawLabel(rw, am, "title", "PLAYERS", hSz2,
+                             sf::Color(45, 65, 100), {colX + pad, plrCardY + pad * 0.6f});
     }
 
     {
@@ -305,15 +318,15 @@ void GUIView::drawRightPanel(sf::RenderWindow& rw, const GameStateView& state) {
 
     {
         float logH = H * 0.42f;
-        const sf::Texture* logCardTex = am.texture("assets/components/card/GameLogCard.png");
+        const sf::Texture* logCardTex = am.texture("assets/components/card/EmptyCard.png");
         if (logCardTex) {
             gui::draw::drawSprite(rw, logCardTex, {{rpX + padX, y}, {colW, logH}});
         } else {
             gui::draw::drawPanel(rw, {{rpX + padX, y}, {colW, logH}},
                                  sf::Color(0x0d, 0x1a, 0x30, 230));
-            gui::draw::drawLabel(rw, am, "bold", "GAME LOG", hSz,
-                                 sf::Color(160, 200, 240), {rpX + padX + padX * 0.4f, y + padY * 0.5f});
         }
+        gui::draw::drawLabel(rw, am, "title", "GAME LOG", hSz,
+                             sf::Color(45, 65, 100), {rpX + padX + padX * 0.4f, y + padY * 0.5f});
 
         const float logPad = colW * 0.06f;
         float logContentY = y + logH * 0.17f;
@@ -328,14 +341,14 @@ void GUIView::drawRightPanel(sf::RenderWindow& rw, const GameStateView& state) {
             const auto& e = log_[static_cast<size_t>(li)];
             std::string line = "[" + e.username + "] " + e.detail;
             if (line.size() > 28) line = line.substr(0, 26) + "..";
-            sf::Color lc = (li == total - 1) ? sf::Color(200, 225, 255)
-                                              : sf::Color(140, 170, 210);
+            sf::Color lc = (li == total - 1) ? sf::Color(25, 45, 85)
+                                              : sf::Color(70, 95, 135);
             gui::draw::drawLabel(rw, am, "regular", line, smSz, lc,
                                  {rpX + padX + logPad, logContentY + (li - start) * lineH});
         }
         if (log_.empty()) {
             gui::draw::drawLabel(rw, am, "regular", "No events yet", smSz,
-                                 sf::Color(120, 150, 190),
+                                 sf::Color(90, 115, 155),
                                  {rpX + padX + logPad, logContentY});
         }
         y += logH + padY * 0.8f;
@@ -422,14 +435,16 @@ void GUIView::drawBottomStrip(sf::RenderWindow& rw, const GameStateView& state) 
     const float stripY = H - botH;
     const float pad    = botH * 0.12f;
 
-    const sf::Texture* propCardTex = am.texture("assets/components/card/YourPropertyCard.png");
+    const sf::Texture* propCardTex = am.texture("assets/components/card/RectEmptyCard.png");
     if (propCardTex) {
         gui::draw::drawSprite(rw, propCardTex, {{stripX, stripY}, {stripW, botH}});
     } else {
         gui::draw::drawPanel(rw, {{stripX, stripY}, {stripW, botH}}, sf::Color(0x0f, 0x1a, 0x32, 220));
+    }
+    {
         unsigned hSz2 = static_cast<unsigned>(botH * 0.18f);
-        gui::draw::drawLabel(rw, am, "bold", "YOUR PROPERTY", hSz2,
-                             sf::Color(160, 200, 240), {stripX + pad, stripY + pad * 0.8f});
+        gui::draw::drawLabel(rw, am, "title", "YOUR PROPERTY", hSz2,
+                             sf::Color(45, 65, 100), {stripX + pad, stripY + pad * 0.8f});
     }
 
     float cardY = stripY + botH * 0.28f;
@@ -445,7 +460,7 @@ void GUIView::drawBottomStrip(sf::RenderWindow& rw, const GameStateView& state) 
             myProps.push_back(&pv);
     }
 
-    if (myProps.empty() && !propCardTex) {
+    if (myProps.empty()) {
         gui::draw::drawLabel(rw, am, "regular", "No properties owned",
                              static_cast<unsigned>(botH * 0.15f),
                              sf::Color(80, 100, 130), {cx, cardY + cardH * 0.3f});

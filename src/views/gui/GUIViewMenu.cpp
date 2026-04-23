@@ -62,14 +62,16 @@ void GUIView::drawNumPlayers() {
     const float cy = static_cast<float>(rw.getSize().y) * 0.5f;
     const float h  = static_cast<float>(rw.getSize().y);
 
-    const float panelW = h * 0.55f, panelH = h * 0.42f;
+    const float panelH = h * 0.42f;
 
     unsigned hSz = static_cast<unsigned>(h * 0.042f);
+    drawMenuText(rw, am, "< Back",
+                 {cx, cy - panelH * 0.48f}, hSz, hoveredItem_ == 20, false);
     drawMenuText(rw, am, "Choose number of players",
                  {cx, cy - panelH * 0.32f}, hSz, false, true);
 
     const char* opts[] = {"2 Players", "3 Players", "4 Players"};
-    const float btnW = panelW * 0.55f, btnH = h * 0.066f;
+    const float btnH = h * 0.066f;
     const float startY = cy - panelH * 0.08f;
     const float gap    = h * 0.09f;
     for (int i = 0; i < 3; ++i) {
@@ -81,7 +83,7 @@ void GUIView::drawNumPlayers() {
 
         unsigned nextSz = static_cast<unsigned>(btnH * 0.9f);
         drawMenuText(rw, am, "Next >",
-             {cx, cy + panelH * 0.38f}, nextSz, hoveredItem_ == 10);
+             {cx, cy + panelH * 0.58f}, nextSz, hoveredItem_ == 10);
 
     rw.display();
 #endif
@@ -256,6 +258,7 @@ void GUIView::drawLoadGame() {
     const float cx = W * 0.5f, cy = H * 0.5f;
 
     unsigned hSz = static_cast<unsigned>(H * 0.042f);
+    drawMenuText(rw, am, "< Back", {cx, cy - H * 0.30f}, hSz, hoveredItem_ == 20, false);
     drawMenuText(rw, am, "Load Game", {cx, cy - H * 0.20f}, hSz, false, true);
 
     unsigned lblSz = static_cast<unsigned>(H * 0.03f);
@@ -308,6 +311,11 @@ bool GUIView::handleMenuEvent(const sf::Event& event) {
         } else if (screen_ == AppScreen::NEW_GAME_NUM_PLAYERS) {
             const float panelH = H * 0.42f;
             const float btnW = H * 0.55f * 0.55f, btnH = H * 0.066f;
+            const float backY = cy - panelH * 0.48f;
+            const float backW = H * 0.18f;
+            if (mx >= cx - backW * 0.5f && mx <= cx + backW * 0.5f &&
+                my >= backY - btnH * 0.5f && my <= backY + btnH * 0.5f)
+                hoveredItem_ = 20;
             const float startY = cy - panelH * 0.08f, gap = H * 0.09f;
             for (int i = 0; i < 3; ++i) {
                 float by = startY + i * gap;
@@ -315,9 +323,15 @@ bool GUIView::handleMenuEvent(const sf::Event& event) {
                     my >= by - btnH * 0.5f && my <= by + btnH * 0.5f)
                     hoveredItem_ = i;
             }
-            float nextY = cy + panelH * 0.38f;
+            float nextY = cy + panelH * 0.58f;
             if (my >= nextY - btnH * 0.5f && my <= nextY + btnH * 0.5f)
                 hoveredItem_ = 10;
+        } else if (screen_ == AppScreen::NEW_GAME_CUST_PLAYER) {
+            const float backY = H * 0.10f;
+            const float backW = H * 0.28f, backH = H * 0.058f;
+            if (mx >= cx - backW * 0.5f && mx <= cx + backW * 0.5f &&
+                my >= backY - backH * 0.5f && my <= backY + backH * 0.5f)
+                hoveredItem_ = 20;
         } else if (screen_ == AppScreen::NEW_GAME_CUST_MAP) {
             const int tileOptions[] = {20,24,28,32,36,40,44,48,52,56,60};
             const int cols = 4;
@@ -339,6 +353,11 @@ bool GUIView::handleMenuEvent(const sf::Event& event) {
                 my >= startY2 - bigH * 0.5f && my <= startY2 + bigH * 0.5f)
                 hoveredItem_ = 20;
         } else if (screen_ == AppScreen::LOAD_GAME) {
+            float backY = cy - H * 0.30f;
+            const float backW = H * 0.18f, backH = H * 0.062f;
+            if (mx >= cx - backW * 0.5f && mx <= cx + backW * 0.5f &&
+                my >= backY - backH * 0.5f && my <= backY + backH * 0.5f)
+                hoveredItem_ = 20;
             float loadY = cy + H * 0.14f;
             const float bW = H * 0.18f, bH = H * 0.062f;
             if (mx >= cx - bW * 0.5f && mx <= cx + bW * 0.5f &&
@@ -368,6 +387,13 @@ bool GUIView::handleMenuEvent(const sf::Event& event) {
         } else if (screen_ == AppScreen::NEW_GAME_NUM_PLAYERS) {
             const float panelH = H * 0.42f;
             const float btnW = H * 0.55f * 0.55f, btnH = H * 0.066f;
+            float backY = cy - panelH * 0.48f;
+            float backW = H * 0.18f;
+            if (mx >= cx - backW * 0.5f && mx <= cx + backW * 0.5f &&
+                my >= backY - btnH * 0.5f && my <= backY + btnH * 0.5f) {
+                screen_ = AppScreen::LANDING;
+                hoveredItem_ = -1;
+            }
             const float startY = cy - panelH * 0.08f, gap = H * 0.09f;
             for (int i = 0; i < 3; ++i) {
                 float by = startY + i * gap;
@@ -375,7 +401,7 @@ bool GUIView::handleMenuEvent(const sf::Event& event) {
                     my >= by - btnH * 0.5f && my <= by + btnH * 0.5f)
                     setup_.numPlayers = i + 2;
             }
-            float nextY = cy + panelH * 0.38f;
+            float nextY = cy + panelH * 0.58f;
             const float nextW = btnW * 0.5f;
             if (mx >= cx - nextW * 0.5f && mx <= cx + nextW * 0.5f &&
                 my >= nextY - btnH * 0.5f && my <= nextY + btnH * 0.5f) {
@@ -389,6 +415,13 @@ bool GUIView::handleMenuEvent(const sf::Event& event) {
                 hoveredItem_ = -1;
             }
         } else if (screen_ == AppScreen::NEW_GAME_CUST_PLAYER) {
+            float backY = H * 0.10f;
+            float backW = H * 0.28f, backH = H * 0.058f;
+            if (mx >= cx - backW * 0.5f && mx <= cx + backW * 0.5f &&
+                my >= backY - backH * 0.5f && my <= backY + backH * 0.5f) {
+                screen_ = AppScreen::NEW_GAME_NUM_PLAYERS;
+                hoveredItem_ = -1;
+            }
             const float H2 = H;
             const float tabW = static_cast<float>(window->getSize().x) * 0.12f;
             const float tabH = H2 * 0.07f;
@@ -433,6 +466,13 @@ bool GUIView::handleMenuEvent(const sf::Event& event) {
                 hoveredItem_ = -1;
             }
         } else if (screen_ == AppScreen::NEW_GAME_CUST_MAP) {
+            float backY = H * 0.10f;
+            float backW = H * 0.28f, backH = H * 0.058f;
+            if (mx >= cx - backW * 0.5f && mx <= cx + backW * 0.5f &&
+                my >= backY - backH * 0.5f && my <= backY + backH * 0.5f) {
+                screen_ = AppScreen::NEW_GAME_CUST_PLAYER;
+                hoveredItem_ = -1;
+            }
             const int tileOptions[] = {20,24,28,32,36,40,44,48,52,56,60};
             const int cols = 4;
             const float btnW = H * 0.12f, btnH = H * 0.058f, gap = H * 0.015f;
@@ -454,6 +494,13 @@ bool GUIView::handleMenuEvent(const sf::Event& event) {
                 return true;   // signal: start game
             }
         } else if (screen_ == AppScreen::LOAD_GAME) {
+            float backY = cy - H * 0.30f;
+            float backW = H * 0.18f, backH = H * 0.062f;
+            if (mx >= cx - backW * 0.5f && mx <= cx + backW * 0.5f &&
+                my >= backY - backH * 0.5f && my <= backY + backH * 0.5f) {
+                screen_ = AppScreen::LANDING;
+                hoveredItem_ = -1;
+            }
             float loadY = cy + H * 0.14f;
             const float bW = H * 0.18f, bH = H * 0.062f;
             if (mx >= cx - bW * 0.5f && mx <= cx + bW * 0.5f &&
