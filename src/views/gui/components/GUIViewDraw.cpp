@@ -68,8 +68,6 @@ void drawTileCard(sf::RenderWindow& rw,
     sf::RectangleShape bg({tileSz, tileSz});
     bg.setPosition(pos);
     bg.setFillColor(hasGroup ? sf::Color(250, 250, 248) : sf::Color(50, 54, 66));
-    bg.setOutlineThickness(1.f);
-    bg.setOutlineColor(sf::Color(18, 20, 25));
     rw.draw(bg, rs);
 
     const float photoFrac = 0.62f;

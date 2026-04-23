@@ -56,25 +56,36 @@ void GUIView::showBoard(const GameStateView& state) {
     const float cH = boardBottom - boardTop;
 
     const float boardSz = std::min(cW, cH);
-    const sf::Vector2f origin{
+    constexpr int EDGE  = 10;
+    constexpr int SIDE  = EDGE + 1;
+    constexpr int TOTAL = EDGE * 4;
+    const float rawTileSz = boardSz / static_cast<float>(SIDE);
+
+    const sf::Vector2f rawOrigin{
         boardLeft + (cW - boardSz) * 0.5f,
         boardTop + (cH - boardSz) * 0.5f,
     };
 
-    constexpr int EDGE  = 10;
-    constexpr int SIDE  = EDGE + 1;
-    constexpr int TOTAL = EDGE * 4;
-    const float tileSz  = boardSz / static_cast<float>(SIDE);
+    const int originX = static_cast<int>(std::floor(rawOrigin.x));
+    const int originY = static_cast<int>(std::floor(rawOrigin.y));
+    const float tileSz = std::ceil(rawTileSz);
+
+    std::array<int, SIDE + 1> sepX, sepY;
+    sepX[0] = originX;
+    sepY[0] = originY;
+    for (int i = 1; i <= SIDE; ++i) {
+        sepX[i] = originX + static_cast<int>(std::floor(i * rawTileSz));
+        sepY[i] = originY + static_cast<int>(std::floor(i * rawTileSz));
+    }
 
     auto tilePos = [&](int idx) -> sf::Vector2f {
-        const float edge = tileSz * static_cast<float>(SIDE);
-        const int   sd   = idx / EDGE;
-        const int   off  = idx % EDGE;
+        const int sd  = idx / EDGE;
+        const int off = idx % EDGE;
         switch (sd) {
-            case 0:  return {origin.x + edge - tileSz - off * tileSz, origin.y + edge - tileSz};
-            case 1:  return {origin.x,                                 origin.y + edge - tileSz - off * tileSz};
-            case 2:  return {origin.x + off * tileSz,                  origin.y};
-            default: return {origin.x + edge - tileSz,                 origin.y + off * tileSz};
+            case 0:  return {static_cast<float>(sepX[SIDE - 1 - off]), static_cast<float>(sepY[SIDE - 1])};
+            case 1:  return {static_cast<float>(sepX[0]),               static_cast<float>(sepY[SIDE - 1 - off])};
+            case 2:  return {static_cast<float>(sepX[off]),             static_cast<float>(sepY[0])};
+            default: return {static_cast<float>(sepX[SIDE - 1]),       static_cast<float>(sepY[off])};
         }
     };
 
@@ -95,6 +106,40 @@ void GUIView::showBoard(const GameStateView& state) {
     const int numTiles = std::min<int>(TOTAL, static_cast<int>(state.tiles.size()));
     for (int i = 0; i < numTiles; ++i)
         gui::draw::drawTileCard(rw, tilePos(i), tileSz, state.tiles[static_cast<size_t>(i)], am);
+
+    // Draw board border and tile separators (2px thick, drawn on top)
+    {
+        sf::Color borderColor(18, 20, 25);
+        const int boardW = sepX[SIDE - 1] + static_cast<int>(tileSz) - sepX[0];
+        const int boardH = sepY[SIDE - 1] + static_cast<int>(tileSz) - sepY[0];
+
+        auto drawRect = [&](float x, float y, float w, float h) {
+            sf::RectangleShape rs({w, h});
+            rs.setPosition({x, y});
+            rs.setFillColor(borderColor);
+            rw.draw(rs);
+        };
+
+        // Outer border (2px thick)
+        drawRect(sepX[0] - 1.f, sepY[0] - 1.f, boardW + 2.f, 2.f);
+        drawRect(sepX[0] - 1.f, sepY[0] + boardH - 1.f, boardW + 2.f, 2.f);
+        drawRect(sepX[0] - 1.f, sepY[0] - 1.f, 2.f, boardH + 2.f);
+        drawRect(sepX[0] + boardW - 1.f, sepY[0] - 1.f, 2.f, boardH + 2.f);
+
+        // Vertical separators (top & bottom sides)
+        for (int k = 1; k <= EDGE; ++k) {
+            float x = static_cast<float>(sepX[k] - 1);
+            drawRect(x, static_cast<float>(sepY[0]), 2.f, tileSz);
+            drawRect(x, static_cast<float>(sepY[SIDE - 1]), 2.f, tileSz);
+        }
+
+        // Horizontal separators (left & right sides)
+        for (int k = 1; k <= EDGE; ++k) {
+            float y = static_cast<float>(sepY[k] - 1);
+            drawRect(static_cast<float>(sepX[0]), y, tileSz, 2.f);
+            drawRect(static_cast<float>(sepX[SIDE - 1]), y, tileSz, 2.f);
+        }
+    }
 
     const float tokenR       = tileSz * 0.16f;
     const float tokenSpacing = tokenR * 2.4f;
