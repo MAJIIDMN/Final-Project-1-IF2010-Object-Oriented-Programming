@@ -54,7 +54,7 @@ int main() {
 
     input.setRenderCallback([&]() {
         if (view.screen() == AppScreen::IN_GAME && gameInitialized) {
-            state.refresh(engine.getState());
+            state.refresh(engine.getState(), &engine.getBoard());
             view.setCurrentPrompt(&input.currentPrompt());
             view.showBoard(state);
         } else {
@@ -174,7 +174,7 @@ int main() {
             if (activeCount <= 1) {
                 engine.stop();
                 view.setScreen(AppScreen::GAME_OVER);
-                state.refresh(engine.getState());
+                state.refresh(engine.getState(), &engine.getBoard());
                 view.showBoard(state);
                 continue;
             }
@@ -182,7 +182,7 @@ int main() {
             if (engine.getState().getCurrentTurn() > engine.getState().getMaxTurn()) {
                 engine.stop();
                 view.setScreen(AppScreen::GAME_OVER);
-                state.refresh(engine.getState());
+                state.refresh(engine.getState(), &engine.getBoard());
                 view.showBoard(state);
                 continue;
             }
@@ -212,7 +212,7 @@ int main() {
                 }
             }
 
-            state.refresh(engine.getState());
+            state.refresh(engine.getState(), &engine.getBoard());
             view.setCurrentPrompt(&input.currentPrompt());
             view.showBoard(state);
         } else {
