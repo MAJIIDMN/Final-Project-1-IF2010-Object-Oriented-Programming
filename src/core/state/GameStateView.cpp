@@ -3,7 +3,7 @@
 #include "models/Player.hpp"
 
 GameStateView::GameStateView()
-	: currentTurn(0), maxTurn(0), activePlayerName(""), activePlayerIndex(0), hasRolledDice(false),
+	: currentTurn(0), maxTurn(0), currentPlayerName(""), activePlayerIndex(0), hasRolledDice(false),
 	  hasUsedSkillCard(false) {}
 
 GameStateView::GameStateView(const GameState& state) : GameStateView() {
@@ -17,12 +17,12 @@ void GameStateView::refresh(const GameState& state) {
 	hasRolledDice = state.getHasRolledDice();
 	hasUsedSkillCard = state.getHasUsedSkillCard();
 
-	activePlayerName.clear();
+	currentPlayerName.clear();
 	if (const Player* activePlayer = state.getActivePlayer()) {
-		activePlayerName = activePlayer->getUsername();
+		currentPlayerName = activePlayer->getUsername();
 	}
 
-	playerViews.clear();
+	players.clear();
 	for (const Player* player : state.getPlayers()) {
 		if (player == nullptr) {
 			continue;
@@ -34,10 +34,10 @@ void GameStateView::refresh(const GameState& state) {
 		view.status = player->getStatus();
 		view.propertyCount = static_cast<int>(player->getProperties().size());
 		view.skillCardCount = static_cast<int>(player->getSkillCards().size());
-		playerViews.push_back(view);
+		players.push_back(view);
 	}
 
-	propertyViews.clear();
+	properties.clear();
 }
 
 int GameStateView::getCurrentTurn() const {
@@ -49,7 +49,7 @@ int GameStateView::getMaxTurn() const {
 }
 
 const std::string& GameStateView::getActivePlayerName() const {
-	return activePlayerName;
+	return currentPlayerName;
 }
 
 int GameStateView::getActivePlayerIndex() const {
@@ -57,11 +57,11 @@ int GameStateView::getActivePlayerIndex() const {
 }
 
 const std::vector<PlayerView>& GameStateView::getPlayers() const {
-	return playerViews;
+	return players;
 }
 
 const std::vector<PropertyView>& GameStateView::getProperties() const {
-	return propertyViews;
+	return properties;
 }
 
 bool GameStateView::getHasRolledDice() const {

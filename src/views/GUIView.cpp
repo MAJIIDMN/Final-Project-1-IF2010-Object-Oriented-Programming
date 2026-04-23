@@ -1,105 +1,90 @@
 #include "ui/GUIView.hpp"
 
+#include "ui/AssetManager.hpp"
+
+#if NIMONSPOLY_ENABLE_SFML
+#include <SFML/Graphics.hpp>
+
+#include <string>
+
+#include "gui/components/GUIViewDraw.hpp"
+#endif
+
 GUIView::GUIView(sf::RenderWindow& window) : window(&window) {}
 
-void GUIView::showBoard(const GameStateView& boardState) {
-    (void)boardState;
-}
+void GUIView::drawLandingPage() {
+#if NIMONSPOLY_ENABLE_SFML
+    if (!window) return;
+    sf::RenderWindow& rw = *window;
+    AssetManager& am = AssetManager::get();
 
-void GUIView::showDiceResult(int d1, int d2, const string& playerName) {
-    (void)d1;
-    (void)d2;
-    (void)playerName;
-}
+    rw.clear(sf::Color(0x1a, 0x27, 0x44));
 
-void GUIView::showPlayerLanding(const string& playerName, const string& tileName) {
-    (void)playerName;
-    (void)tileName;
-}
+    const float W  = static_cast<float>(rw.getSize().x);
+    const float H  = static_cast<float>(rw.getSize().y);
+    const float cx = W * 0.5f;
+    const float cy = H * 0.5f;
 
-void GUIView::showPropertyCard(const PropertyInfo& propertyInfo) {
-    (void)propertyInfo;
-}
+    const sf::Texture* globeTex = am.texture("assets/bg/Globe.png");
+    if (globeTex) {
+        gui::draw::drawSpriteCover(rw, globeTex);
+    } else {
+        gui::draw::drawGlobeBackground(rw);
+    }
 
-void GUIView::showPlayerProperties(const vector<PropertyInfo>& list) {
-    (void)list;
-}
+    const sf::Texture* titleTex = am.texture("assets/bg/Title.png");
+    if (titleTex) {
+        auto tsz = titleTex->getSize();
+        float base = (W < H) ? W : H;
+        float titleW = base * 0.55f;
+        float titleH = titleW * static_cast<float>(tsz.y) / static_cast<float>(tsz.x);
+        sf::RenderStates addBlend;
+        addBlend.blendMode = sf::BlendAdd;
+        gui::draw::drawSprite(rw, titleTex,
+                      {{cx - titleW * 0.5f, cy - H * 0.04f - titleH * 0.5f},
+                               {titleW, titleH}},
+                              addBlend);
+    } else {
+        unsigned titleSz = static_cast<unsigned>(H * 0.12f);
+        gui::draw::drawCenteredText(rw, am, "title", "NIMONS", titleSz,
+                                    sf::Color(255, 255, 255), cy - H * 0.10f);
+        gui::draw::drawCenteredText(rw, am, "title", "POLY",   titleSz,
+                                    sf::Color(255, 255, 255), cy + H * 0.02f);
+        unsigned suitSz = static_cast<unsigned>(H * 0.08f);
+        sf::Text ls(am.font("bold"), "♠", suitSz);
+        ls.setFillColor(sf::Color(255, 255, 255, 80));
+        auto b = ls.getLocalBounds();
+        ls.setOrigin({b.position.x + b.size.x * 0.5f, b.position.y + b.size.y * 0.5f});
+        ls.setPosition({cx - H * 0.32f, cy - H * 0.04f});
+        rw.draw(ls);
+        sf::Text rs2(am.font("bold"), "♣", suitSz);
+        rs2.setFillColor(sf::Color(255, 255, 255, 80));
+        b = rs2.getLocalBounds();
+        rs2.setOrigin({b.position.x + b.size.x * 0.5f, b.position.y + b.size.y * 0.5f});
+        rs2.setPosition({cx + H * 0.32f, cy - H * 0.04f});
+        rw.draw(rs2);
+    }
 
-void GUIView::showBuyPrompt(const PropertyInfo& propertyInfo, Money playerMoney) {
-    (void)propertyInfo;
-    (void)playerMoney;
-}
+    unsigned subSz = static_cast<unsigned>(H * 0.022f);
+    // gui::draw::drawCenteredText(rw, am, "title", "presented by BurntCheesecake", subSz,
+                                // sf::Color(210, 220, 235), cy + H * 0.12f);
 
-void GUIView::showRentPayment(const RentInfo& rentInfo) {
-    (void)rentInfo;
-}
+    const char* items[] = {"New Game", "Load Game", "Credits", "Exit"};
+    const float btnH = H * 0.058f;
+    const float startY = cy + H * 0.22f;
+    const float gap    = H * 0.072f;
+    for (int i = 0; i < 4; ++i) {
+        bool  hov = hoveredItem_ == i;
+        sf::Color tc = hov ? sf::Color(255, 255, 255) : sf::Color(210, 220, 235);
+        unsigned csz = static_cast<unsigned>(btnH * 0.92f);
+        sf::Text t(am.font("title"), items[i], csz);
+        t.setFillColor(tc);
+        auto b = t.getLocalBounds();
+        t.setOrigin({b.position.x + b.size.x * 0.5f, b.position.y + b.size.y * 0.5f});
+        t.setPosition({cx, startY + i * gap});
+        rw.draw(t);
+    }
 
-void GUIView::showTaxPrompt(const TaxInfo& taxInfo) {
-    (void)taxInfo;
-}
-
-void GUIView::showAuctionState(const AuctionState& auctionState) {
-    (void)auctionState;
-}
-
-void GUIView::showFestivalPrompt(const vector<PropertyInfo>& ownedProperties) {
-    (void)ownedProperties;
-}
-
-void GUIView::showBankruptcy(const BankruptcyInfo& bankruptcyInfo) {
-    (void)bankruptcyInfo;
-}
-
-void GUIView::showLiquidationPanel(const LiquidationState& liquidationState) {
-    (void)liquidationState;
-}
-
-void GUIView::showCardDrawn(const CardInfo& cardInfo) {
-    (void)cardInfo;
-}
-
-void GUIView::showSkillCardHand(const vector<CardInfo>& cards) {
-    (void)cards;
-}
-
-void GUIView::showTransactionLog(const vector<LogEntry>& entries) {
-    (void)entries;
-}
-
-void GUIView::showWinner(const WinnerInfo& winInfo) {
-    (void)winInfo;
-}
-
-void GUIView::showJailStatus(const JailInfo& jailInfo) {
-    (void)jailInfo;
-}
-
-void GUIView::showMessage(const string& message) {
-    (void)message;
-}
-
-void GUIView::showBuildMenu(const BuildMenuState& buildMenuState) {
-    (void)buildMenuState;
-}
-
-void GUIView::showMortgageMenu(const MortgageMenuState& mortgageMenuState) {
-    (void)mortgageMenuState;
-}
-
-void GUIView::showRedeemMenu(const RedeemMenuState& redeemMenuState) {
-    (void)redeemMenuState;
-}
-
-void GUIView::showDropCardPrompt(const vector<CardInfo>& cards) {
-    (void)cards;
-}
-
-void GUIView::showSaveLoadStatus(const string& message) {
-    (void)message;
-}
-
-void GUIView::showTurnInfo(const string& playerName, int turnNum, int maxTurn) {
-    (void)playerName;
-    (void)turnNum;
-    (void)maxTurn;
+    rw.display();
+#endif
 }

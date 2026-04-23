@@ -66,14 +66,25 @@ pair<int, int> ConsoleInput::getManualDice() {
     return {d1, d2};
 }
 
-AuctionAction ConsoleInput::getAuctionAction(const string& playerName, int currentBid, int playerMoney) {
+AuctionDecision ConsoleInput::getAuctionDecision(const string& playerName, int currentBid, int playerMoney) {
     std::cout << playerName << " uang " << playerMoney << ", bid tertinggi " << currentBid << ". BID/PASS? ";
     string action;
     std::getline(std::cin, action);
     if (action.empty()) {
         std::getline(std::cin, action);
     }
-    return (!action.empty() && (action[0] == 'b' || action[0] == 'B')) ? AuctionAction::BID : AuctionAction::PASS;
+    bool isBid = !action.empty() && (action[0] == 'b' || action[0] == 'B');
+    if (isBid) {
+        int bid = currentBid + 1;
+        std::cout << "Masukkan jumlah bid: ";
+        if (std::cin >> bid) {
+            clearLine();
+            return {AuctionAction::BID, bid};
+        }
+        std::cin.clear();
+        clearLine();
+    }
+    return {AuctionAction::PASS, 0};
 }
 
 TaxChoice ConsoleInput::getTaxChoice() {

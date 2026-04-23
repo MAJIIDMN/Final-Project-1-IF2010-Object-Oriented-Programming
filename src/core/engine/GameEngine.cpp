@@ -1117,9 +1117,9 @@ bool GameEngine::auctionProperty(PropertyTile& property, Player& trigger) {
 		if (!bidder || bidder->isBankrupt()) {
 			continue;
 		}
-		AuctionAction action = AuctionAction::PASS;
+		AuctionDecision decision;
 		if (PlayerController* controller = bidder->getController()) {
-			action = controller->decideAuction(highestBid, bidder->getMoney());
+			decision = controller->decideAuction(highestBid, bidder->getMoney());
 		}
 		if (action == AuctionAction::BID) {
 			int bid = highestBid + 1;

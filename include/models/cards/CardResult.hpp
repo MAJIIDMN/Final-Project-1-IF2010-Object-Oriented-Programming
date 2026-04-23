@@ -24,7 +24,7 @@ enum class CardResultAction : uint8_t {
     DEMOLISH_PROPERTY,
 };
 
-class CardResult {
+class CardResult{
 public:
     bool success{true};
     std::string message;

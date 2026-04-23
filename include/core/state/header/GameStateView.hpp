@@ -1,5 +1,4 @@
-#ifndef CORE_STATE_GAME_STATE_VIEW_HPP
-#define CORE_STATE_GAME_STATE_VIEW_HPP
+#pragma once
 
 #include <string>
 #include <vector>
@@ -7,8 +6,21 @@
 #include "core/state/header/GameState.hpp"
 #include "utils/Types.hpp"
 
+// Read-only snapshot passed to IGameView::showBoard() and other render calls.
+// Task 5 (GameEngine) populates this; UI layer only reads it.
 class GameStateView {
 public:
+    vector<TileView>    tiles;           // all board tiles in index order (0-based)
+    vector<PlayerView>  players;         // all players (including bankrupt)
+    vector<PropertyView> properties;     // all ownable properties
+
+    int    currentTurn{0};
+    int    maxTurn{0};
+    string currentPlayerName;
+	int    activePlayerIndex{0};
+	bool   hasRolledDice{false};
+	bool   hasUsedSkillCard{false};
+
 	GameStateView();
 	explicit GameStateView(const GameState& state);
 
@@ -24,18 +36,4 @@ public:
 	bool getHasUsedSkillCard() const;
 
 	std::string render(const GameState& state) const;
-
-private:
-	int currentTurn;
-	int maxTurn;
-	std::string activePlayerName;
-	int activePlayerIndex;
-	std::vector<PlayerView> playerViews;
-	std::vector<PropertyView> propertyViews;
-	bool hasRolledDice;
-	bool hasUsedSkillCard;
-
-protected:
 };
-
-#endif

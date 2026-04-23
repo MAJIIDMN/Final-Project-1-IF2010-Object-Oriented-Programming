@@ -1,5 +1,6 @@
 #pragma once
 
+#include <array>
 #include <string>
 #include <vector>
 
@@ -17,7 +18,7 @@ class Player;
 class Board;
 class PropertyTile;
 
-class GameContext {
+class GameContext{
 public:
     Bank& bank;
     FestivalManager& festivalManager;
@@ -29,7 +30,7 @@ public:
     int currentTurn;
 };
 
-class LandingResult {
+class LandingResult{
 public:
     LandingAction action;
     int amount;
@@ -37,7 +38,7 @@ public:
     PropertyTile* property;
 };
 
-class LogEntry {
+class LogEntry{
 public:
     int turn;
     string username;
@@ -45,14 +46,14 @@ public:
     string detail;
 };
 
-class AuctionResult {
+class AuctionResult{
 public:
     Player* winner;
     int finalPrice;
     PropertyTile* property;
 };
 
-class FestivalEffect {
+class FestivalEffect{
 public:
     Player* owner;
     int multiplier;
@@ -60,7 +61,7 @@ public:
     int timesApplied;
 };
 
-class PlayerView {
+class PlayerView{
 public:
     string username;
     Money money;
@@ -70,11 +71,79 @@ public:
     int skillCardCount;
 };
 
-class PropertyView {
+class PropertyView{
 public:
     string code;
     string name;
     string ownerName;
     PropertyStatus status;
     int buildingLevel;
+};
+
+class TileView{
+public:
+    int index;
+    string code;
+    string name;
+    TileType type;
+    Color color;
+};
+
+class AuctionDecision{
+public:
+    AuctionAction action{AuctionAction::PASS};
+    int bidAmount{0};
+};
+
+class PlayerSummary{
+public:
+    string username;
+    Money money;
+    int propertyCount;
+    int cardCount;
+    bool isBankrupt;
+};
+
+class LiquidationOption{
+public:
+    int index;
+    LiquidationType type;
+    string code;
+    string name;
+    Money value;
+    string description;
+};
+
+class TileBuildOption{
+public:
+    string code;
+    string name;
+    int currentLevel;
+    bool canBuild;
+    int buildCost;
+};
+
+class ColorGroupBuildOption{
+public:
+    string colorName;
+    Color color;
+    vector<TileBuildOption> tiles;
+};
+
+class MortgageOption{
+public:
+    string code;
+    string name;
+    Color color;
+    Money mortgageValue;
+    bool requiresBuildingSale;
+};
+
+class RedeemOption{
+public:
+    string code;
+    string name;
+    Color color;
+    Money redeemCost;
+    bool canAfford;
 };
