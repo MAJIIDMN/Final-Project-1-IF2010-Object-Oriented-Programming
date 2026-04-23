@@ -3,6 +3,7 @@
 #include <string>
 #include <vector>
 
+#include "core/state/header/GameState.hpp"
 #include "utils/Types.hpp"
 
 // Read-only snapshot passed to IGameView::showBoard() and other render calls.
@@ -16,4 +17,23 @@ public:
     int    currentTurn{0};
     int    maxTurn{0};
     string currentPlayerName;
+	int    activePlayerIndex{0};
+	bool   hasRolledDice{false};
+	bool   hasUsedSkillCard{false};
+
+	GameStateView();
+	explicit GameStateView(const GameState& state);
+
+	void refresh(const GameState& state);
+
+	int getCurrentTurn() const;
+	int getMaxTurn() const;
+	const std::string& getActivePlayerName() const;
+	int getActivePlayerIndex() const;
+	const std::vector<PlayerView>& getPlayers() const;
+	const std::vector<PropertyView>& getProperties() const;
+	bool getHasRolledDice() const;
+	bool getHasUsedSkillCard() const;
+
+	std::string render(const GameState& state) const;
 };

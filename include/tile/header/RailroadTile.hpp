@@ -1,14 +1,15 @@
-#ifndef RAILROAD_TILE_HPP
-#define RAILROAD_TILE_HPP
+#ifndef TILE_HEADER_RAILROAD_TILE_HPP
+#define TILE_HEADER_RAILROAD_TILE_HPP
 
-#include "PropertyTile.hpp"
+#include "tile/header/PropertyTile.hpp"
+#include "utils/Enums.hpp"
 
 class RailroadTile : public PropertyTile {
 public:
+	RailroadTile(int id, const std::string& code, const std::string& name,
+				 Money price, Money mortgageValue);
 
-private:
-
-protected:
+	Money getRent(int diceRoll = 0) const override;
 };
 
 #endif

@@ -1,8 +1,14 @@
 #include "models/Player.hpp"
 #include "models/effects/Effect.hpp"
+#include "models/cards/SkillCard.hpp"
 #include "controllers/PlayerController.hpp"
+#include "tile/header/PropertyTile.hpp"
+#include "tile/header/RailroadTile.hpp"
+#include "tile/header/StreetTile.hpp"
+#include "tile/header/UtilityTile.hpp"
 #include "utils/Exceptions.hpp"
 #include <algorithm>
+#include <stdexcept>
 
 Player::Player(const std::string& username, Money startingMoney, PlayerController* controller)
     : username(username), money(startingMoney), position(0),
@@ -10,6 +16,10 @@ Player::Player(const std::string& username, Money startingMoney, PlayerControlle
       jailTurnsRemaining(0), consecutiveDoubles(0),
       hasUsedSkillCardThisTurn(false), hasRolledDiceThisTurn(false),
       turnCount(0) {}
+
+Player::~Player() = default;
+Player::Player(Player&& other) noexcept = default;
+Player& Player::operator=(Player&& other) noexcept = default;
 
 const std::string& Player::getUsername() const {
     return username;
@@ -76,77 +86,122 @@ void Player::removeProperty(PropertyTile* tile) {
 }
 
 std::vector<StreetTile*> Player::getPropertiesByColor(Color color) const {
-    (void)color;
-    // Kelas lain belum diimplement
-    return {};
+    std::vector<StreetTile*> result;
+    for (PropertyTile* property : properties) {
+        if (auto* street = dynamic_cast<StreetTile*>(property)) {
+            if (street->getColor() == color) {
+                result.push_back(street);
+            }
+        }
+    }
+    return result;
 }
 
 bool Player::hasMonopoly(Color color) const {
-    (void)color;
-    return false;
+    const std::vector<StreetTile*> owned = getPropertiesByColor(color);
+    if (owned.empty()) {
+        return false;
+    }
+    for (const StreetTile* street : owned) {
+        if (!street->isMonopolyComplete()) {
+            return false;
+        }
+    }
+    return true;
 }
 
 int Player::countRailroads() const {
-    return 0;
+    int count = 0;
+    for (const PropertyTile* property : properties) {
+        if (property && property->getType() == TileType::RAILROAD && !property->isMortgaged()) {
+            ++count;
+        }
+    }
+    return count;
 }
 
 int Player::countUtilities() const {
-    return 0;
+    int count = 0;
+    for (const PropertyTile* property : properties) {
+        if (property && property->getType() == TileType::UTILITY && !property->isMortgaged()) {
+            ++count;
+        }
+    }
+    return count;
 }
 
 const std::vector<SkillCard*>& Player::getSkillCards() const {
-    return skillCards;
+    skillCardView.clear();
+    for (const auto& card : skillCards) {
+        skillCardView.push_back(card.get());
+    }
+    return skillCardView;
 }
 
 void Player::addSkillCard(SkillCard* card) {
+    if (!card) {
+        throw std::invalid_argument("Cannot add null skill card.");
+    }
     if (static_cast<int>(skillCards.size()) >= MAX_SKILL_CARDS)
         throw CardSlotFullException(MAX_SKILL_CARDS);
-    skillCards.push_back(card);
+    skillCards.emplace_back(card);
 }
 
 SkillCard* Player::removeSkillCard(int index) {
     if (index < 0 || index >= static_cast<int>(skillCards.size())) {
         return nullptr;
     }
-    SkillCard* c = skillCards[index];
+    SkillCard* c = skillCards[index].release();
     skillCards.erase(skillCards.begin() + index);
     return c;
 }
 
 const std::vector<Effect*>& Player::getActiveEffects() const {
-    return activeEffects;
+    activeEffectView.clear();
+    for (const auto& effect : activeEffects) {
+        activeEffectView.push_back(effect.get());
+    }
+    return activeEffectView;
 }
 
 void Player::addEffect(Effect* effect) {
-    activeEffects.push_back(effect);
+    if (!effect) {
+        return;
+    }
+    effect->onStart(*this);
+    activeEffects.emplace_back(effect);
 }
 
 void Player::tickEffects() {
-    for (auto* e : activeEffects)
+    for (auto& e : activeEffects)
         if (e) e->tick();
 
-    activeEffects.erase(
-        std::remove_if(activeEffects.begin(), activeEffects.end(),
-            [](Effect* e) { return e && e->isExpired(); }),
-        activeEffects.end());
+    for (auto it = activeEffects.begin(); it != activeEffects.end(); ) {
+        if (*it && (*it)->isExpired()) {
+            (*it)->onEnd(*this);
+            it = activeEffects.erase(it);
+        } else {
+            ++it;
+        }
+    }
 }
 
 Money Player::applyOutgoingModifiers(const Money& amount) const {
     Money result = amount;
-    for (auto* e : activeEffects)
+    for (const auto& e : activeEffects)
         if (e) result = e->modifyOutgoingPayment(result);
     return result;
 }
 
 Money Player::applyIncomingModifiers(const Money& amount, PropertyTile* prop) const {
     Money result = amount;
-    for (auto* e : activeEffects)
+    for (const auto& e : activeEffects)
         if (e) result = e->modifyRent(result, prop);
     return result;
 }
 
 bool Player::isPaymentBlocked() const {
-    for (auto* e : activeEffects)
+    for (const auto& e : activeEffects)
         if (e && e->blockPayment()) {
             return true;
         }
@@ -158,7 +213,22 @@ PlayerController* Player::getController() const {
 }
 
 Money Player::getTotalWealth() const {
-    return money;
+    Money total = money;
+    for (const PropertyTile* property : properties) {
+        if (!property) {
+            continue;
+        }
+        total += property->getPrice();
+        if (auto* street = dynamic_cast<const StreetTile*>(property)) {
+            const int level = street->getBuildingLevel();
+            const int houses = std::min(level, 4);
+            total += Money(street->getHouseCost().getAmount() * houses);
+            if (street->hasHotel()) {
+                total += street->getHotelCost();
+            }
+        }
+    }
+    return total;
 }
 
 bool Player::getHasUsedSkillCardThisTurn() const {

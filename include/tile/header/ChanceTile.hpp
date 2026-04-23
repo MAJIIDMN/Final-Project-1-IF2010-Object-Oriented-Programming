@@ -1,14 +1,12 @@
-#ifndef CHANCE_TILE_HPP
-#define CHANCE_TILE_HPP
+#ifndef TILE_HEADER_CHANCE_TILE_HPP
+#define TILE_HEADER_CHANCE_TILE_HPP
 
-#include "ActionTile.hpp"
+#include "tile/header/ActionTile.hpp"
+#include "utils/Enums.hpp"
 
 class ChanceTile : public ActionTile {
 public:
-
-private:
-
-protected:
+	ChanceTile(int id, const std::string& code, const std::string& name);
 };
 
 #endif

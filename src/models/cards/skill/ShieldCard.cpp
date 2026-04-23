@@ -29,6 +29,10 @@ SkillCardType ShieldCard::getCardType() const {
     return SkillCardType::SHIELD;
 }
 
+std::string ShieldCard::getSaveDuration() const {
+    return std::to_string(duration);
+}
+
 std::string ShieldCard::getId() const {
     return "ShieldCard";
 }
