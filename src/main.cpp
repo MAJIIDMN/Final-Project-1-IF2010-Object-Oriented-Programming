@@ -65,6 +65,8 @@ int main() {
         pendingCommand.clear();
         gui::menu::finalizeSetupPlayers(view.setup());
 
+        engine.loadConfiguration("config", view.setup().numTiles);
+
         ownedPlayers.reserve(static_cast<size_t>(view.setup().numPlayers));
         ownedControllers.reserve(static_cast<size_t>(view.setup().numPlayers));
         players.reserve(static_cast<size_t>(view.setup().numPlayers));

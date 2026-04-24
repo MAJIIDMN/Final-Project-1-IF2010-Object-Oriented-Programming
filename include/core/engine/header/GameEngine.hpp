@@ -33,7 +33,7 @@ public:
 	GameEngine& operator=(GameEngine&& other) noexcept = default;
 
 	void initialize(const std::vector<Player*>& players, int maxTurn);
-	bool loadConfiguration(const std::string& directory = "config");
+	bool loadConfiguration(const std::string& directory = "config", int numTiles = 40);
 	void start();
 	void stop();
 	void runGameLoop();
@@ -62,7 +62,7 @@ public:
 	void printWinners() const;
 
 private:
-	void buildDefaultBoard(const std::string& configDirectory);
+	void buildDefaultBoard(const std::string& configDirectory, int numTiles = 40);
 	void executeTurn(Player& player);
 	void prepareTurn(Player& player);
 	void endTurn(Player& player);
@@ -109,6 +109,7 @@ private:
 	Board board;
 	CardSystem cardSystem;
 	std::string configDirectory;
+	int numTiles;
 	IGameRepository* repository;
 
 protected:

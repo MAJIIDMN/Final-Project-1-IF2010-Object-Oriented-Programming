@@ -250,10 +250,10 @@ GameEngine::GameEngine(GameState initialState)
 	: gameState(initialState), running(false), turnPrepared(false), lastDiceTotal(0), commandRegistry(),
 	  turnManager(), auctionManager(), bankruptcyManager(), eventBus(), transactionLogger(), bank(),
 	  festivalManager(), gameConfig(), dice(), board(), cardSystem(), configDirectory("config"),
-	  repository(nullptr) {
+	  numTiles(40), repository(nullptr) {
 	bankruptcyManager.setBankruptcyThreshold(0);
 	eventBus.subscribe(&transactionLogger);
-	loadConfiguration(configDirectory);
+	loadConfiguration(configDirectory, numTiles);
 }
 
 void GameEngine::initialize(const std::vector<Player*>& players, int maxTurn) {
@@ -268,95 +268,149 @@ void GameEngine::initialize(const std::vector<Player*>& players, int maxTurn) {
 	gameState.setCurrentTurn(turnManager.getTurnNumber());
 }
 
-bool GameEngine::loadConfiguration(const std::string& directory) {
+bool GameEngine::loadConfiguration(const std::string& directory, int targetNumTiles) {
 	configDirectory = directory.empty() ? "config" : directory;
+	numTiles = targetNumTiles > 0 ? targetNumTiles : 40;
 	const bool loaded = gameConfig.loadFromDirectory(configDirectory.c_str());
-	buildDefaultBoard(configDirectory);
+	buildDefaultBoard(configDirectory, numTiles);
 	return loaded;
 }
 
-void GameEngine::buildDefaultBoard(const std::string& directory) {
+void GameEngine::buildDefaultBoard(const std::string& directory, int targetNumTiles) {
 	board.clear();
-	std::map<int, std::unique_ptr<Tile>> configuredTiles;
+	const std::string sizeDir = directory + "/" + std::to_string(targetNumTiles);
 
-	std::ifstream file(directory + "/property.txt");
-	std::string line;
-	while (std::getline(file, line)) {
-		PropertyRow row;
-		if (!parsePropertyRow(line, row)) {
-			continue;
-		}
-
-		const int id = row.id;
-		const std::string normalizedKind = lower(row.kind);
-		if (normalizedKind == "street") {
-			auto street = std::make_unique<StreetTile>(
-				id - 1,
-				normalizeCode(row.code),
-				displayName(row.name),
-				Money(row.price),
-				Money(row.mortgage),
-				parseColor(row.colorText),
-				Money(row.houseCost),
-				Money(row.hotelCost),
-				completeRentLevels(row.rents)
-			);
-			ColorGroup* group = board.ensureColorGroup(street->getColor());
-			group->addStreet(street.get());
-			configuredTiles[id - 1] = std::move(street);
-		} else if (normalizedKind == "railroad") {
-			configuredTiles[id - 1] = std::make_unique<RailroadTile>(
-				id - 1, normalizeCode(row.code), displayName(row.name), Money(row.price), Money(row.mortgage)
-			);
-		} else if (normalizedKind == "utility") {
-			configuredTiles[id - 1] = std::make_unique<UtilityTile>(
-				id - 1, normalizeCode(row.code), displayName(row.name), Money(row.price), Money(row.mortgage)
-			);
+	// Parse property.txt
+	std::map<std::string, PropertyRow> propertyMap;
+	{
+		std::ifstream file(sizeDir + "/property.txt");
+		std::string line;
+		while (std::getline(file, line)) {
+			PropertyRow row;
+			if (!parsePropertyRow(line, row)) {
+				continue;
+			}
+			propertyMap[normalizeCode(row.code)] = row;
 		}
 	}
 
-	for (int i = 0; i < Board::BOARD_SIZE; ++i) {
-		auto configured = configuredTiles.find(i);
-		if (configured != configuredTiles.end()) {
-			board.addTile(std::move(configured->second));
+	// Parse aksi.txt
+	struct AksiRow {
+		int id{0};
+		std::string code;
+		std::string name;
+		std::string kind;
+	};
+	std::map<std::string, AksiRow> aksiMap;
+	{
+		std::ifstream file(sizeDir + "/aksi.txt");
+		std::string line;
+		while (std::getline(file, line)) {
+			const std::vector<std::string> tokens = splitTokens(line);
+			if (tokens.size() < 4) {
+				continue;
+			}
+			AksiRow row;
+			if (!parseIntToken(tokens[0], row.id)) {
+				continue;
+			}
+			row.code = tokens[1];
+			row.name = tokens[2];
+			row.kind = tokens[3];
+			aksiMap[normalizeCode(row.code)] = row;
+		}
+	}
+
+	// Parse board.txt and create tiles
+	std::ifstream boardFile(sizeDir + "/board.txt");
+	std::string line;
+	int index = 0;
+	while (std::getline(boardFile, line) && index < targetNumTiles) {
+		const std::vector<std::string> tokens = splitTokens(line);
+		if (tokens.empty()) {
 			continue;
 		}
 
-		switch (i + 1) {
-			case 1:
-				board.addTile(std::make_unique<GoTile>(i, "GO", "Petak Mulai", gameConfig.getGoSalary()));
-				break;
-			case 3:
-			case 18:
-				board.addTile(std::make_unique<CommunityChestTile>(i, "DNU", "Dana Umum"));
-				break;
-			case 5:
-				board.addTile(std::make_unique<PPHTile>(i, "PPH", "Pajak Penghasilan", gameConfig.getPphFlat(), gameConfig.getPphPercentage()));
-				break;
-			case 8:
-			case 34:
-				board.addTile(std::make_unique<FestivalTile>(i, "FES", "Festival"));
-				break;
-			case 11:
-				board.addTile(std::make_unique<JailTile>(i, "PEN", "Penjara", gameConfig.getJailFine()));
-				break;
-			case 21:
-				board.addTile(std::make_unique<FreeParkingTile>(i, "BBP", "Bebas Parkir"));
-				break;
-			case 23:
-			case 37:
-				board.addTile(std::make_unique<ChanceTile>(i, "KSP", "Kesempatan"));
-				break;
-			case 31:
-				board.addTile(std::make_unique<GoToJailTile>(i, "PPJ", "Pergi ke Penjara"));
-				break;
-			case 39:
-				board.addTile(std::make_unique<PBMTile>(i, "PBM", "Pajak Barang Mewah", gameConfig.getPbmFlat()));
-				break;
-			default:
-				board.addTile(std::make_unique<FreeParkingTile>(i, "UNK", "Kosong"));
-				break;
+		const std::string code = normalizeCode(tokens[0]);
+
+		// Try property first
+		auto propIt = propertyMap.find(code);
+		if (propIt != propertyMap.end()) {
+			const PropertyRow& row = propIt->second;
+			const std::string normalizedKind = lower(row.kind);
+			if (normalizedKind == "street") {
+				auto street = std::make_unique<StreetTile>(
+					index, code, displayName(row.name),
+					Money(row.price), Money(row.mortgage),
+					parseColor(row.colorText),
+					Money(row.houseCost), Money(row.hotelCost),
+					completeRentLevels(row.rents)
+				);
+				ColorGroup* group = board.ensureColorGroup(street->getColor());
+				group->addStreet(street.get());
+				board.addTile(std::move(street));
+			} else if (normalizedKind == "railroad") {
+				board.addTile(std::make_unique<RailroadTile>(
+					index, code, displayName(row.name), Money(row.price), Money(row.mortgage)
+				));
+			} else if (normalizedKind == "utility") {
+				board.addTile(std::make_unique<UtilityTile>(
+					index, code, displayName(row.name), Money(row.price), Money(row.mortgage)
+				));
+			}
+			++index;
+			continue;
 		}
+
+		// Try aksi
+		auto aksiIt = aksiMap.find(code);
+		if (aksiIt != aksiMap.end()) {
+			const AksiRow& row = aksiIt->second;
+			const std::string kind = lower(row.kind);
+			if (kind == "go" || kind == "spesial") {
+				board.addTile(std::make_unique<GoTile>(index, code, displayName(row.name), gameConfig.getGoSalary()));
+			} else if (kind == "jail") {
+				board.addTile(std::make_unique<JailTile>(index, code, displayName(row.name), gameConfig.getJailFine()));
+			} else if (kind == "free_parking") {
+				board.addTile(std::make_unique<FreeParkingTile>(index, code, displayName(row.name)));
+			} else if (kind == "go_to_jail") {
+				board.addTile(std::make_unique<GoToJailTile>(index, code, displayName(row.name)));
+			} else if (kind == "chance" || kind == "kartu") {
+				// Check if it's chance or community based on code
+				if (code == "KSP") {
+					board.addTile(std::make_unique<ChanceTile>(index, code, displayName(row.name)));
+				} else if (code == "DNU") {
+					board.addTile(std::make_unique<CommunityChestTile>(index, code, displayName(row.name)));
+				} else {
+					board.addTile(std::make_unique<ChanceTile>(index, code, displayName(row.name)));
+				}
+			} else if (kind == "community") {
+				board.addTile(std::make_unique<CommunityChestTile>(index, code, displayName(row.name)));
+			} else if (kind == "festival") {
+				board.addTile(std::make_unique<FestivalTile>(index, code, displayName(row.name)));
+			} else if (kind == "tax_pph" || kind == "pajak") {
+				if (code == "PPH") {
+					board.addTile(std::make_unique<PPHTile>(index, code, displayName(row.name), gameConfig.getPphFlat(), gameConfig.getPphPercentage()));
+				} else if (code == "PBM") {
+					board.addTile(std::make_unique<PBMTile>(index, code, displayName(row.name), gameConfig.getPbmFlat()));
+				} else {
+					board.addTile(std::make_unique<PPHTile>(index, code, displayName(row.name), gameConfig.getPphFlat(), gameConfig.getPphPercentage()));
+				}
+			} else if (kind == "tax_pbm") {
+				board.addTile(std::make_unique<PBMTile>(index, code, displayName(row.name), gameConfig.getPbmFlat()));
+			} else {
+				board.addTile(std::make_unique<FreeParkingTile>(index, code, displayName(row.name)));
+			}
+			++index;
+			continue;
+		}
+
+		// Unknown tile
+		throw InvalidBoardConfigException("Unknown tile code '" + code + "' at position " + std::to_string(index));
+	}
+
+	if (index != targetNumTiles) {
+		throw InvalidBoardConfigException("Board layout has " + std::to_string(index) + " tiles, expected " + std::to_string(targetNumTiles));
 	}
 }
 
@@ -471,6 +525,21 @@ bool GameEngine::loadGame(const std::string& id) {
 	if (!repository) {
 		return false;
 	}
+
+	// Read board size from save file header for potential board rebuild
+	std::ifstream check(id);
+	if (check) {
+		std::string header;
+		std::getline(check, header);
+		std::istringstream hs(header);
+		int currentTurn = 0, maxTurn = 0, nPlayers = 0, savedBoardSize = 0;
+		if (hs >> currentTurn >> maxTurn >> nPlayers >> savedBoardSize) {
+			if (savedBoardSize > 0 && savedBoardSize != board.getSize()) {
+				loadConfiguration(configDirectory, savedBoardSize);
+			}
+		}
+	}
+
 	if (!repository->loadInto(gameState, board, transactionLogger, festivalManager, id)) {
 		return false;
 	}
