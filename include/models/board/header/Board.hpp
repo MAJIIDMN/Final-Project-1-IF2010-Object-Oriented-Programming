@@ -14,8 +14,6 @@ class PropertyTile;
 
 class Board {
 public:
-	static constexpr int BOARD_SIZE = 40;
-
 	Board();
 	~Board();
 

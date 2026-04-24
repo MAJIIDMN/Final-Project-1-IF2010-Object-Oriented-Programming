@@ -70,7 +70,7 @@ namespace {
 
     int effectiveBoardSize(const GameContext& context) {
         const int size = context.board.getSize();
-        return size > 0 ? size : Board::BOARD_SIZE;
+        return size > 0 ? size : 40;
     }
 
     int normalizePosition(int position, int boardSize) {
