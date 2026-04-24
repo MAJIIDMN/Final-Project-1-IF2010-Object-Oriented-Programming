@@ -172,7 +172,7 @@ bool TextFileRepository::save(const GameState& state, const Board& board, const 
 
 	const auto& players = state.getPlayers();
 	const int nPlayers = static_cast<int>(players.size());
-	out << state.getCurrentTurn() << ' ' << state.getMaxTurn() << ' ' << nPlayers << '\n';
+	out << state.getCurrentTurn() << ' ' << state.getMaxTurn() << ' ' << nPlayers << ' ' << board.getSize() << '\n';
 
 	std::map<std::string, std::tuple<int, int, int>> festivalByCode;
 	for (const FestivalEffectSnapshot& snap : festivals.getActiveEffectsSnapshot()) {

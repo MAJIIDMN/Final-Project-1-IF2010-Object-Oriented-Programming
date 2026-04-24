@@ -525,6 +525,21 @@ bool GameEngine::loadGame(const std::string& id) {
 	if (!repository) {
 		return false;
 	}
+
+	// Read board size from save file header for potential board rebuild
+	std::ifstream check(id);
+	if (check) {
+		std::string header;
+		std::getline(check, header);
+		std::istringstream hs(header);
+		int currentTurn = 0, maxTurn = 0, nPlayers = 0, savedBoardSize = 0;
+		if (hs >> currentTurn >> maxTurn >> nPlayers >> savedBoardSize) {
+			if (savedBoardSize > 0 && savedBoardSize != board.getSize()) {
+				loadConfiguration(configDirectory, savedBoardSize);
+			}
+		}
+	}
+
 	if (!repository->loadInto(gameState, board, transactionLogger, festivalManager, id)) {
 		return false;
 	}
