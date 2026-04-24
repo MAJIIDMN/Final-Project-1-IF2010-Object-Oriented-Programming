@@ -43,6 +43,10 @@ bool Dice::isDouble() const {
 	return die1 == die2;
 }
 
+bool Dice::hasManualSet() const {
+	return manualSet;
+}
+
 int Dice::getLastRoll() const {
 	return getTotal();
 }

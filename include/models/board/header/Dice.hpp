@@ -16,6 +16,7 @@ public:
 	int getDie2() const;
 	int getTotal() const;
 	bool isDouble() const;
+	bool hasManualSet() const;
 
 	int getLastRoll() const;
 	int getSides() const;

@@ -56,11 +56,23 @@ namespace gui::menu {
         return (value % modulo + modulo) % modulo;
     }
 
+    inline bool hasValidSetupIndex(int value, int limit) {
+        return value >= 0 && value < limit;
+    }
+
     inline int selectedPlayerColor(const SetupState& setup, int playerIndex) {
         if (playerIndex >= 0 && playerIndex < static_cast<int>(setup.playerColors.size())) {
-            return normalizeSetupIndex(setup.playerColors[static_cast<size_t>(playerIndex)], kSetupColorCount);
+            const int value = setup.playerColors[static_cast<size_t>(playerIndex)];
+            if (hasValidSetupIndex(value, kSetupColorCount)) {
+                return value;
+            }
         }
-        return normalizeSetupIndex(playerIndex, kSetupColorCount);
+        return -1;
+    }
+
+    inline int effectivePlayerColor(const SetupState& setup, int playerIndex) {
+        const int chosen = selectedPlayerColor(setup, playerIndex);
+        return chosen >= 0 ? chosen : normalizeSetupIndex(playerIndex, kSetupColorCount);
     }
 
     inline int selectedPlayerCharacter(const SetupState& setup, int playerIndex) {
@@ -75,7 +87,8 @@ namespace gui::menu {
             if (i == currentPlayerIndex) {
                 continue;
             }
-            if (selectedPlayerColor(setup, i) == colorIndex) {
+            const int selected = selectedPlayerColor(setup, i);
+            if (selected >= 0 && selected == colorIndex) {
                 return true;
             }
         }
@@ -104,26 +117,11 @@ namespace gui::menu {
         std::vector<int> colors(count, -1);
         std::array<bool, kSetupColorCount> usedColors{};
         for (size_t i = 0; i < count && i < setup.playerColors.size(); ++i) {
-            const int color = normalizeSetupIndex(setup.playerColors[i], kSetupColorCount);
-            if (!usedColors[static_cast<size_t>(color)]) {
+            const int color = setup.playerColors[i];
+            if (hasValidSetupIndex(color, kSetupColorCount) &&
+                !usedColors[static_cast<size_t>(color)]) {
                 colors[i] = color;
                 usedColors[static_cast<size_t>(color)] = true;
-            }
-        }
-
-        for (size_t i = 0; i < count; ++i) {
-            if (colors[i] != -1) {
-                continue;
-            }
-            for (int candidate = 0; candidate < kSetupColorCount; ++candidate) {
-                if (!usedColors[static_cast<size_t>(candidate)]) {
-                    colors[i] = candidate;
-                    usedColors[static_cast<size_t>(candidate)] = true;
-                    break;
-                }
-            }
-            if (colors[i] == -1) {
-                colors[i] = normalizeSetupIndex(static_cast<int>(i), kSetupColorCount);
             }
         }
         setup.playerColors = std::move(colors);
@@ -137,6 +135,33 @@ namespace gui::menu {
             }
         }
         setup.playerCharacters = std::move(characters);
+    }
+
+    inline void finalizeSetupPlayers(SetupState& setup) {
+        prepareSetupPlayers(setup);
+
+        std::array<bool, kSetupColorCount> usedColors{};
+        for (int color : setup.playerColors) {
+            if (hasValidSetupIndex(color, kSetupColorCount)) {
+                usedColors[static_cast<size_t>(color)] = true;
+            }
+        }
+
+        for (size_t i = 0; i < setup.playerColors.size(); ++i) {
+            if (hasValidSetupIndex(setup.playerColors[i], kSetupColorCount)) {
+                continue;
+            }
+            for (int candidate = 0; candidate < kSetupColorCount; ++candidate) {
+                if (!usedColors[static_cast<size_t>(candidate)]) {
+                    setup.playerColors[i] = candidate;
+                    usedColors[static_cast<size_t>(candidate)] = true;
+                    break;
+                }
+            }
+            if (!hasValidSetupIndex(setup.playerColors[i], kSetupColorCount)) {
+                setup.playerColors[i] = normalizeSetupIndex(static_cast<int>(i), kSetupColorCount);
+            }
+        }
     }
 
     inline Vector2 rectCenter(const Rectangle& rect) {
@@ -157,34 +182,42 @@ namespace gui::menu {
 
     inline NumPlayersLayout makeNumPlayersLayout(float W, float H) {
         NumPlayersLayout layout{};
+        const float buttonW = std::min(W * 0.28f, 370.f);
+        const float buttonH = std::min(H * 0.065f, 68.f);
+        const float gap = std::min(H * 0.024f, 26.f);
+        const float nextButtonH = std::min(H * 0.055f, 56.f);
+        const float titleH = std::min(H * 0.052f, 52.f);
+        const float buttonX = W * 0.5f;
+        constexpr float kPadTop = 24.f;
+        constexpr float kPadBottom = 28.f;
+        constexpr float kTitleGap = 28.f;
+        constexpr float kNextGap = 24.f;
+
+        const float contentH = kPadTop + titleH + kTitleGap +
+                               3.f * buttonH + 2.f * gap + kNextGap +
+                               nextButtonH + kPadBottom;
         const float panelW = std::min(W * 0.40f, 560.f);
-        const float panelH = std::min(H * 0.50f, 480.f);
-        layout.panel = Rectangle{
-            W * 0.5f - panelW * 0.5f,
-            H * 0.5f - panelH * 0.5f,
-            panelW,
-            panelH,
-        };
+        const float panelH = std::max(contentH, std::min(H * 0.52f, 500.f));
+        const float panelX = W * 0.5f - panelW * 0.5f;
+        const float panelY = H * 0.5f - panelH * 0.5f;
+        layout.panel = {panelX, panelY, panelW, panelH};
 
-        const float buttonW = panelW * 0.66f;
-        const float buttonH = std::min(H * 0.065f, 70.f);
-        const float gap = std::min(H * 0.028f, 28.f);
-        const float optionStartY = layout.panel.y + panelH * 0.38f;
-        const float buttonX = layout.panel.x + panelW * 0.5f;
+        layout.titleY = panelY + kPadTop + titleH * 0.5f;
 
-        layout.backButton = centeredRect(layout.panel.x + 66.f,
-                                         layout.panel.y - H * 0.055f,
-                                         128.f,
-                                         std::min(H * 0.05f, 52.f));
-        layout.titleY = layout.panel.y + panelH * 0.18f;
+        const float optionTop = panelY + kPadTop + titleH + kTitleGap;
         for (int i = 0; i < 3; ++i) {
-            layout.optionButtons[static_cast<size_t>(i)] =
-                centeredRect(buttonX, optionStartY + i * (buttonH + gap), buttonW, buttonH);
+            const float cy = optionTop + buttonH * 0.5f + i * (buttonH + gap);
+            layout.optionButtons[static_cast<size_t>(i)] = centeredRect(buttonX, cy, buttonW, buttonH);
         }
+
+        const float lastOptionBottom = optionTop + 3.f * buttonH + 2.f * gap;
         layout.nextButton = centeredRect(buttonX,
-                                         layout.panel.y + panelH - H * 0.075f,
-                                         166.f,
-                                         std::min(H * 0.055f, 56.f));
+                                         lastOptionBottom + kNextGap + nextButtonH * 0.5f,
+                                         166.f, nextButtonH);
+
+        layout.backButton = centeredRect(panelX + 66.f,
+                                         panelY - std::min(H * 0.045f, 44.f) - 8.f,
+                                         128.f, std::min(H * 0.05f, 50.f));
         return layout;
     }
 
@@ -211,90 +244,109 @@ namespace gui::menu {
 
     inline CustomizePlayerLayout makeCustomizePlayerLayout(float W, float H, int numPlayers) {
         CustomizePlayerLayout layout{};
+
         const float mainPanelW = std::min(W * 0.48f, 720.f);
-        const float mainPanelH = std::min(H * 0.64f, 690.f);
         const float sidePanelW = std::min(W * 0.12f, 150.f);
         const float gapX = std::min(W * 0.03f, 42.f);
+        const float padX = std::min(mainPanelW * 0.08f, 72.f);
+        const float contentW = mainPanelW - padX * 2.f;
+        const float nameBoxH = std::min(H * 0.055f, 54.f);
+        const float colorGap = std::min(W * 0.012f, 18.f);
+        const float colorSlotW = (contentW - colorGap * 3.f) / 4.f;
+        const float colorSlotH = std::min(H * 0.11f, 108.f);
+        const float charPreviewW = std::min(contentW * 0.36f, 250.f);
+        const float charPreviewH = std::min(H * 0.12f, 124.f);
+        const float arrowW = std::min(W * 0.045f, 66.f);
+        const float arrowH = charPreviewH * 0.78f;
+        const float typeGap = std::min(W * 0.02f, 22.f);
+        const float typeButtonW = (contentW - typeGap) * 0.5f;
+        const float typeButtonH = std::min(H * 0.055f, 54.f);
+        const float nextButtonH = std::min(H * 0.05f, 52.f);
+
+        constexpr float kLabelH = 16.f;
+        constexpr float kLabelGap = 18.f;
+        constexpr float kSectionGap = 22.f;
+        constexpr float kPadTop = 68.f;
+        constexpr float kPadBottom = 28.f;
+
+        float rel = kPadTop;
+        const float nameLabelRel = rel;  rel += kLabelH + kLabelGap;
+        const float nameBoxRel   = rel;  rel += nameBoxH + kSectionGap;
+        const float colorLabelRel = rel; rel += kLabelH + kLabelGap;
+        const float colorTopRel  = rel;  rel += colorSlotH + kSectionGap;
+        const float charLabelRel = rel;  rel += kLabelH + kLabelGap;
+        const float charTopRel   = rel;  rel += charPreviewH + kSectionGap;
+        const float typeLabelRel = rel;  rel += kLabelH + kLabelGap;
+        const float typeTopRel   = rel;  rel += typeButtonH + kSectionGap;
+        const float nextBtnRel   = rel;  rel += nextButtonH + kPadBottom;
+
+        const float mainPanelH = std::max(rel, std::min(H * 0.68f, 720.f));
         const float totalW = sidePanelW + gapX + mainPanelW;
         const float left = W * 0.5f - totalW * 0.5f;
-        const float top = H * 0.19f;
+        const float top = std::min(H * 0.19f, std::max(20.f, H - mainPanelH - 40.f));
 
-        layout.sidePanel = Rectangle{left, top, sidePanelW, mainPanelH};
-        layout.mainPanel = Rectangle{left + sidePanelW + gapX, top, mainPanelW, mainPanelH};
-        layout.backButton = centeredRect(layout.sidePanel.x + layout.sidePanel.width * 0.5f,
-                                         H * 0.10f,
-                                         128.f,
-                                         std::min(H * 0.05f, 52.f));
-        layout.nextButton = centeredRect(layout.mainPanel.x + mainPanelW - 78.f,
-                                         top + mainPanelH - 34.f,
-                                         156.f,
-                                         std::min(H * 0.055f, 56.f));
+        layout.sidePanel = {left, top, sidePanelW, mainPanelH};
+        layout.mainPanel = {left + sidePanelW + gapX, top, mainPanelW, mainPanelH};
+
+        const float cLeft = layout.mainPanel.x + padX;
+        const float panelTop = layout.mainPanel.y;
+
+        layout.nameLabelY = panelTop + nameLabelRel;
+        layout.nameBox = {cLeft, panelTop + nameBoxRel, contentW, nameBoxH};
+
+        layout.colorLabelY = panelTop + colorLabelRel;
+        const float colorAbsTop = panelTop + colorTopRel;
+        for (int i = 0; i < kSetupColorCount; ++i) {
+            layout.colorSlots[static_cast<size_t>(i)] = {
+                cLeft + i * (colorSlotW + colorGap),
+                colorAbsTop, colorSlotW, colorSlotH,
+            };
+        }
+
+        layout.characterLabelY = panelTop + charLabelRel;
+        const float charAbsTop = panelTop + charTopRel;
+        layout.characterPreview = centeredRect(
+            layout.mainPanel.x + mainPanelW * 0.5f,
+            charAbsTop + charPreviewH * 0.5f,
+            charPreviewW, charPreviewH);
+        layout.characterLeft = centeredRect(
+            layout.characterPreview.x - arrowW * 0.5f - 18.f,
+            rectCenter(layout.characterPreview).y,
+            arrowW, arrowH);
+        layout.characterRight = centeredRect(
+            layout.characterPreview.x + layout.characterPreview.width + arrowW * 0.5f + 18.f,
+            rectCenter(layout.characterPreview).y,
+            arrowW, arrowH);
+
+        layout.typeLabelY = panelTop + typeLabelRel;
+        const float typeAbsTop = panelTop + typeTopRel;
+        layout.humanButton = {cLeft, typeAbsTop, typeButtonW, typeButtonH};
+        layout.computerButton = {cLeft + typeButtonW + typeGap, typeAbsTop, typeButtonW, typeButtonH};
+
+        layout.nextButton = centeredRect(
+            layout.mainPanel.x + mainPanelW - 78.f,
+            panelTop + nextBtnRel + nextButtonH * 0.5f,
+            156.f, nextButtonH);
+
+        layout.backButton = centeredRect(
+            layout.sidePanel.x + layout.sidePanel.width * 0.5f,
+            H * 0.10f,
+            128.f, std::min(H * 0.05f, 52.f));
 
         const float railPad = std::min(H * 0.018f, 18.f);
         layout.tabGap = std::min(H * 0.012f, 14.f);
         const int safePlayers = std::max(1, numPlayers);
         const float railInnerH = mainPanelH - railPad * 2.f;
-        const float rawTabH =
-            (railInnerH - layout.tabGap * static_cast<float>(safePlayers - 1)) /
-            static_cast<float>(safePlayers);
+        const float rawTabH = (railInnerH - layout.tabGap * static_cast<float>(safePlayers - 1)) /
+                               static_cast<float>(safePlayers);
         layout.tabSize = Vector2{
             sidePanelW - railPad * 2.f,
             std::clamp(rawTabH, 58.f, 86.f),
         };
-        const float totalTabsH =
-            layout.tabSize.y * static_cast<float>(safePlayers) +
-            layout.tabGap * static_cast<float>(safePlayers - 1);
+        const float totalTabsH = layout.tabSize.y * static_cast<float>(safePlayers) +
+                                  layout.tabGap * static_cast<float>(safePlayers - 1);
         layout.tabStartY = top + (mainPanelH - totalTabsH) * 0.5f;
 
-        const float padX = std::min(mainPanelW * 0.08f, 72.f);
-        const float contentLeft = layout.mainPanel.x + padX;
-        const float contentW = mainPanelW - padX * 2.f;
-        const float nameBoxH = std::min(H * 0.06f, 58.f);
-        const float colorGap = std::min(W * 0.012f, 18.f);
-        const float colorSlotW = (contentW - colorGap * 3.f) / 4.f;
-        const float colorSlotH = std::min(H * 0.12f, 118.f);
-        const float characterPreviewW = std::min(contentW * 0.36f, 250.f);
-        const float characterPreviewH = std::min(H * 0.13f, 132.f);
-        const float arrowW = std::min(W * 0.045f, 66.f);
-        const float arrowH = characterPreviewH * 0.78f;
-        const float typeGap = std::min(W * 0.02f, 22.f);
-        const float typeButtonW = (contentW - typeGap) * 0.5f;
-        const float typeButtonH = std::min(H * 0.06f, 60.f);
-
-        layout.nameLabelY = top + std::min(mainPanelH * 0.11f, 82.f);
-        layout.nameBox = Rectangle{contentLeft, layout.nameLabelY + 26.f, contentW, nameBoxH};
-        layout.colorLabelY = layout.nameBox.y + nameBoxH + 34.f;
-        const float colorTop = layout.colorLabelY + 24.f;
-        for (int i = 0; i < kSetupColorCount; ++i) {
-            layout.colorSlots[static_cast<size_t>(i)] = Rectangle{
-                contentLeft + i * (colorSlotW + colorGap),
-                colorTop,
-                colorSlotW,
-                colorSlotH,
-            };
-        }
-
-        layout.characterLabelY = colorTop + colorSlotH + 36.f;
-        const float characterTop = layout.characterLabelY + 24.f;
-        layout.characterPreview = centeredRect(layout.mainPanel.x + mainPanelW * 0.5f,
-                                               characterTop + characterPreviewH * 0.5f,
-                                               characterPreviewW,
-                                               characterPreviewH);
-        layout.characterLeft = centeredRect(layout.characterPreview.x - arrowW * 0.5f - 18.f,
-                                            rectCenter(layout.characterPreview).y,
-                                            arrowW,
-                                            arrowH);
-        layout.characterRight = centeredRect(layout.characterPreview.x +
-                                                 layout.characterPreview.width +
-                                                 arrowW * 0.5f + 18.f,
-                                             rectCenter(layout.characterPreview).y,
-                                             arrowW,
-                                             arrowH);
-
-        layout.typeLabelY = characterTop + characterPreviewH + 36.f;
-        const float typeTop = layout.typeLabelY + 24.f;
-        layout.humanButton = Rectangle{contentLeft, typeTop, typeButtonW, typeButtonH};
-        layout.computerButton = Rectangle{contentLeft + typeButtonW + typeGap, typeTop, typeButtonW, typeButtonH};
         return layout;
     }
 

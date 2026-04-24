@@ -52,6 +52,40 @@ namespace {
 		return value;
 	}
 
+	std::string tileLabel(const Tile& tile) {
+		return tile.getName() + " (" + tile.getCode() + ")";
+	}
+
+	std::string propertyLabel(const PropertyTile& property) {
+		return tileLabel(property);
+	}
+
+	struct PropertyRow {
+		int id{0};
+		std::string code;
+		std::string name;
+		std::string kind;
+		std::string colorText;
+		int price{0};
+		int mortgage{0};
+		int houseCost{0};
+		int hotelCost{0};
+		std::vector<int> rents;
+	};
+
+	std::vector<std::string> splitTokens(const std::string& line) {
+		std::vector<std::string> tokens;
+		std::istringstream stream(line);
+		std::string token;
+		while (stream >> token) {
+			if (!token.empty() && token[0] == '#') {
+				break;
+			}
+			tokens.push_back(token);
+		}
+		return tokens;
+	}
+
 	bool parseIntToken(const std::string& token, int& out) {
 		try {
 			std::size_t used = 0;
@@ -161,6 +195,44 @@ namespace {
 		return rents;
 	}
 
+	bool parsePropertyRow(const std::string& line, PropertyRow& row) {
+		const std::vector<std::string> tokens = splitTokens(line);
+		if (tokens.empty()) {
+			return false;
+		}
+
+		if (!parseIntToken(tokens[0], row.id) || tokens.size() < 7) {
+			return false;
+		}
+
+		row.code = tokens[1];
+		row.name = tokens[2];
+		row.kind = tokens[3];
+		row.colorText = tokens[4];
+		if (!parseIntToken(tokens[5], row.price) ||
+			!parseIntToken(tokens[6], row.mortgage)) {
+			return false;
+		}
+
+		const std::string normalizedKind = lower(row.kind);
+		if (normalizedKind == "street") {
+			if (tokens.size() < 9 ||
+				!parseIntToken(tokens[7], row.houseCost) ||
+				!parseIntToken(tokens[8], row.hotelCost)) {
+				return false;
+			}
+
+			for (std::size_t i = 9; i < tokens.size(); ++i) {
+				int rent = 0;
+				if (parseIntToken(tokens[i], rent)) {
+					row.rents.push_back(rent);
+				}
+			}
+		}
+
+		return true;
+	}
+
 	PropertyInfo makePropertyInfo(const PropertyTile& property) {
 		PropertyInfo info;
 		info.code = property.getCode();
@@ -209,59 +281,36 @@ void GameEngine::buildDefaultBoard(const std::string& directory) {
 
 	std::ifstream file(directory + "/property.txt");
 	std::string line;
-	std::getline(file, line);
 	while (std::getline(file, line)) {
-		if (line.empty()) {
+		PropertyRow row;
+		if (!parsePropertyRow(line, row)) {
 			continue;
 		}
 
-		std::istringstream stream(line);
-		int id = 0;
-		std::string code;
-		std::string name;
-		std::string kind;
-		std::string colorText;
-		int price = 0;
-		int mortgage = 0;
-		if (!(stream >> id >> code >> name >> kind >> colorText >> price >> mortgage)) {
-			continue;
-		}
-
-		const std::string normalizedKind = lower(kind);
+		const int id = row.id;
+		const std::string normalizedKind = lower(row.kind);
 		if (normalizedKind == "street") {
-			int houseCost = 0;
-			int hotelCost = 0;
-			stream >> houseCost >> hotelCost;
-			std::vector<int> parsedRents;
-			std::string token;
-			while (stream >> token) {
-				int value = 0;
-				if (parseIntToken(token, value)) {
-					parsedRents.push_back(value);
-				}
-			}
-
 			auto street = std::make_unique<StreetTile>(
 				id - 1,
-				normalizeCode(code),
-				displayName(name),
-				Money(price),
-				Money(mortgage),
-				parseColor(colorText),
-				Money(houseCost),
-				Money(hotelCost),
-				completeRentLevels(parsedRents)
+				normalizeCode(row.code),
+				displayName(row.name),
+				Money(row.price),
+				Money(row.mortgage),
+				parseColor(row.colorText),
+				Money(row.houseCost),
+				Money(row.hotelCost),
+				completeRentLevels(row.rents)
 			);
 			ColorGroup* group = board.ensureColorGroup(street->getColor());
 			group->addStreet(street.get());
 			configuredTiles[id - 1] = std::move(street);
 		} else if (normalizedKind == "railroad") {
 			configuredTiles[id - 1] = std::make_unique<RailroadTile>(
-				id - 1, normalizeCode(code), displayName(name), Money(price), Money(mortgage)
+				id - 1, normalizeCode(row.code), displayName(row.name), Money(row.price), Money(row.mortgage)
 			);
 		} else if (normalizedKind == "utility") {
 			configuredTiles[id - 1] = std::make_unique<UtilityTile>(
-				id - 1, normalizeCode(code), displayName(name), Money(price), Money(mortgage)
+				id - 1, normalizeCode(row.code), displayName(row.name), Money(row.price), Money(row.mortgage)
 			);
 		}
 	}
@@ -539,7 +588,10 @@ bool GameEngine::processCommand(const std::string& input, Player& player) {
 			int d2 = 0;
 			stream >> dadu >> d1 >> d2;
 			dice.setManual(d1, d2);
-			rollDice(player);
+			transactionLogger.log(gameState.getCurrentTurn(),
+				player.getUsername(),
+				"ATUR_DADU",
+				"Roll berikutnya: " + std::to_string(d1) + "+" + std::to_string(d2));
 			return true;
 		}
 
@@ -649,9 +701,9 @@ void GameEngine::prepareTurn(Player& player) {
 	auto card = cardSystem.drawSkill();
 	if (card) {
 		std::cout << player.getUsername() << " mendapat kartu " << card->getName() << ".\n";
-		try {
+		if (static_cast<int>(player.getSkillCards().size()) < Player::MAX_SKILL_CARDS) {
 			player.addSkillCard(card.release());
-		} catch (const CardSlotFullException&) {
+		} else {
 			std::unique_ptr<SkillCard> overflow(std::move(card));
 			std::vector<CardInfo> infos;
 			for (SkillCard* owned : player.getSkillCards()) {
@@ -696,6 +748,7 @@ void GameEngine::rollDice(Player& player) {
 		return;
 	}
 
+	const bool manualRoll = dice.hasManualSet();
 	const auto [d1, d2] = dice.rollPair();
 	lastDiceTotal = d1 + d2;
 	player.setHasRolledDiceThisTurn(true);
@@ -703,7 +756,8 @@ void GameEngine::rollDice(Player& player) {
 
 	std::cout << "Hasil dadu: " << d1 << " + " << d2 << " = " << lastDiceTotal << "\n";
 	transactionLogger.log(gameState.getCurrentTurn(), player.getUsername(), "DADU",
-		"Lempar: " + std::to_string(d1) + "+" + std::to_string(d2) + "=" + std::to_string(lastDiceTotal));
+		std::string(manualRoll ? "Lempar manual " : "Lempar ") +
+		std::to_string(d1) + "+" + std::to_string(d2) + " = " + std::to_string(lastDiceTotal));
 
 	if (d1 == d2) {
 		player.setConsecutiveDoubles(player.getConsecutiveDoubles() + 1);
@@ -756,6 +810,8 @@ void GameEngine::resolveLanding(Player& player, int diceTotal) {
 	}
 
 	std::cout << "Mendarat di " << tile->getName() << " (" << tile->getCode() << ").\n";
+	transactionLogger.log(gameState.getCurrentTurn(), player.getUsername(), "PETAK",
+		"Mendarat di " + tileLabel(*tile));
 	switch (tile->getType()) {
 		case TileType::STREET:
 		case TileType::RAILROAD:
@@ -821,6 +877,8 @@ void GameEngine::resolvePropertyLanding(Player& player, PropertyTile& property, 
 				player.addProperty(&property);
 				board.updateMonopolies();
 				std::cout << property.getName() << " kini milik " << player.getUsername() << ".\n";
+				transactionLogger.log(gameState.getCurrentTurn(), player.getUsername(), "BELI",
+					"Beli " + propertyLabel(property) + " " + property.getPrice().toString());
 			}
 			return;
 		}
@@ -835,7 +893,8 @@ void GameEngine::resolvePropertyLanding(Player& player, PropertyTile& property, 
 			property.setStatus(PropertyStatus::OWNED);
 			player.addProperty(&property);
 			board.updateMonopolies();
-			transactionLogger.log(gameState.getCurrentTurn(), player.getUsername(), "BELI", property.getCode());
+			transactionLogger.log(gameState.getCurrentTurn(), player.getUsername(), "BELI",
+				"Beli " + propertyLabel(property) + " " + property.getPrice().toString());
 		} else {
 			auctionProperty(property, player);
 		}
@@ -855,7 +914,8 @@ void GameEngine::resolvePropertyLanding(Player& player, PropertyTile& property, 
 		return;
 	}
 	bank.transferBetweenPlayers(player, *owner, rent, "Sewa " + property.getCode());
-	transactionLogger.log(gameState.getCurrentTurn(), player.getUsername(), "SEWA", property.getCode() + " " + rent.toString());
+	transactionLogger.log(gameState.getCurrentTurn(), player.getUsername(), "SEWA",
+		"Bayar sewa " + propertyLabel(property) + " " + rent.toString());
 }
 
 void GameEngine::resolveTaxLanding(Player& player, bool pph) {
@@ -876,7 +936,8 @@ void GameEngine::resolveTaxLanding(Player& player, bool pph) {
 		return;
 	}
 	bank.collectFromPlayer(player, tax, "Pajak");
-	transactionLogger.log(gameState.getCurrentTurn(), player.getUsername(), "PAJAK", tax.toString());
+	transactionLogger.log(gameState.getCurrentTurn(), player.getUsername(), "PAJAK",
+		"Bayar pajak " + tax.toString());
 }
 
 void GameEngine::resolveFestivalLanding(Player& player) {
@@ -902,7 +963,7 @@ void GameEngine::resolveFestivalLanding(Player& player) {
 	}
 	FestivalResult result = festivalManager.applyFestival(player, *property);
 	transactionLogger.log(gameState.getCurrentTurn(), player.getUsername(), "FESTIVAL",
-		property->getCode() + " x" + std::to_string(result.getMultiplier()));
+		"Aktifkan festival di " + propertyLabel(*property) + " x" + std::to_string(result.getMultiplier()));
 }
 
 void GameEngine::useSkillCard(Player& player, int cardIndex) {
@@ -958,7 +1019,8 @@ void GameEngine::useSkillCard(Player& player, int cardIndex) {
 	player.setHasUsedSkillCardThisTurn(true);
 	gameState.setHasUsedSkillCard(true);
 	cardSystem.discardSkill(std::move(card));
-	transactionLogger.log(gameState.getCurrentTurn(), player.getUsername(), "KARTU", result.message);
+	transactionLogger.log(gameState.getCurrentTurn(), player.getUsername(), "KARTU",
+		result.message.empty() ? "Menggunakan kartu kemampuan" : result.message);
 	if (applied.resolveLanding) {
 		resolveLanding(player, lastDiceTotal);
 	}
@@ -984,7 +1046,8 @@ void GameEngine::mortgageProperty(Player& player, const std::string& code) {
 	property->setStatus(PropertyStatus::MORTGAGED);
 	bank.payPlayer(player, property->getMortgageValue(), "Gadai");
 	board.updateMonopolies();
-	transactionLogger.log(gameState.getCurrentTurn(), player.getUsername(), "GADAI", property->getCode());
+	transactionLogger.log(gameState.getCurrentTurn(), player.getUsername(), "GADAI",
+		"Gadai " + propertyLabel(*property));
 }
 
 void GameEngine::redeemProperty(Player& player, const std::string& code) {
@@ -1001,7 +1064,8 @@ void GameEngine::redeemProperty(Player& player, const std::string& code) {
 	bank.collectFromPlayer(player, cost, "Tebus");
 	property->setStatus(PropertyStatus::OWNED);
 	board.updateMonopolies();
-	transactionLogger.log(gameState.getCurrentTurn(), player.getUsername(), "TEBUS", property->getCode());
+	transactionLogger.log(gameState.getCurrentTurn(), player.getUsername(), "TEBUS",
+		"Tebus " + propertyLabel(*property) + " " + cost.toString());
 }
 
 void GameEngine::buildOnProperty(Player& player, const std::string& code) {
@@ -1039,7 +1103,8 @@ void GameEngine::buildOnProperty(Player& player, const std::string& code) {
 	}
 	bank.collectFromPlayer(player, cost, "Bangun");
 	street->build();
-	transactionLogger.log(gameState.getCurrentTurn(), player.getUsername(), "BANGUN", street->getCode());
+	transactionLogger.log(gameState.getCurrentTurn(), player.getUsername(), "BANGUN",
+		"Bangun di " + propertyLabel(*street) + " level " + std::to_string(street->getBuildingLevel()));
 }
 
 void GameEngine::printBoard() const {
@@ -1146,7 +1211,8 @@ bool GameEngine::auctionProperty(PropertyTile& property, Player& trigger) {
 	property.setStatus(PropertyStatus::OWNED);
 	winner->addProperty(&property);
 	board.updateMonopolies();
-	transactionLogger.log(gameState.getCurrentTurn(), winner->getUsername(), "LELANG", property.getCode() + " " + std::to_string(highestBid));
+	transactionLogger.log(gameState.getCurrentTurn(), winner->getUsername(), "LELANG",
+		"Menang lelang " + propertyLabel(property) + " " + Money(highestBid).toString());
 	std::cout << "Pemenang lelang: " << winner->getUsername() << "\n";
 	return true;
 }
@@ -1208,6 +1274,7 @@ void GameEngine::handleJailTurn(Player& player) {
 		transactionLogger.log(gameState.getCurrentTurn(), player.getUsername(), "PENJARA", "Denda wajib giliran ke-3");
 	}
 
+	const bool manualRoll = dice.hasManualSet();
 	const auto [d1, d2] = dice.rollPair();
 	lastDiceTotal = d1 + d2;
 	player.setHasRolledDiceThisTurn(true);
@@ -1215,7 +1282,8 @@ void GameEngine::handleJailTurn(Player& player) {
 
 	std::cout << "Hasil dadu (penjara): " << d1 << " + " << d2 << " = " << lastDiceTotal << "\n";
 	transactionLogger.log(gameState.getCurrentTurn(), player.getUsername(), "DADU_PENJARA",
-		std::to_string(d1) + "+" + std::to_string(d2) + "=" + std::to_string(lastDiceTotal));
+		std::string(manualRoll ? "Lempar penjara manual " : "Lempar penjara ") +
+		std::to_string(d1) + "+" + std::to_string(d2) + " = " + std::to_string(lastDiceTotal));
 
 	if (!player.isJailed()) {
 		if (d1 == d2) {

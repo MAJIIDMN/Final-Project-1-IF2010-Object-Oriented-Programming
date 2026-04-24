@@ -125,6 +125,12 @@ bool GUIInput::updatePrompt() {
         return false;
     }
 
+    if (prompt_.type == GUIPromptType::DICE_MANUAL && IsKeyPressed(KEY_ESCAPE)) {
+        prompt_.cancelled = true;
+        prompt_.resolved = true;
+        return true;
+    }
+
     appendTextInput();
 
     if (prompt_.type == GUIPromptType::MENU_CHOICE ||
@@ -227,6 +233,9 @@ string GUIInput::getString(const string& promptText) {
 pair<int, int> GUIInput::getManualDice() {
     activatePrompt(GUIPromptType::DICE_MANUAL, "Dadu manual (D1 D2, misal: 3 5)");
     waitForResolution();
+    if (prompt_.cancelled) {
+        return {0, 0};
+    }
     return {prompt_.resInt / 10, prompt_.resInt % 10};
 }
 

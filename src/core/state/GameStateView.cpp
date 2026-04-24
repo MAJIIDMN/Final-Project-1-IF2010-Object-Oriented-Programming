@@ -11,20 +11,9 @@
 namespace {
 	std::string tileSubtitle(const Tile& tile) {
 		switch (tile.getType()) {
-			case TileType::STREET: return "Property";
-			case TileType::RAILROAD: return "Station";
-			case TileType::UTILITY: return "Utility";
-			case TileType::CHANCE: return "Chance";
-			case TileType::COMMUNITY_CHEST: return "Community Chest";
-			case TileType::FESTIVAL: return "Festival";
-			case TileType::TAX_PPH: return "Income Tax";
-			case TileType::TAX_PBM: return "Luxury Tax";
-			case TileType::GO: return "Collect Salary";
 			case TileType::JAIL: return "Just Visiting";
-			case TileType::FREE_PARKING: return "Take a Break";
-			case TileType::GO_TO_JAIL: return "Move to Jail";
+			default: return "";
 		}
-		return "";
 	}
 
 	void populatePropertyView(PropertyView& snapshot, const PropertyTile& property) {

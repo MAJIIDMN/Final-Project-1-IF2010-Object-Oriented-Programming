@@ -23,6 +23,10 @@ namespace {
         return type == TileType::STREET || type == TileType::RAILROAD || type == TileType::UTILITY;
     }
 
+    bool stripStartsAtLeadingEdge(BoardSide side) {
+        return side == BoardSide::BOTTOM || side == BoardSide::TOP;
+    }
+
     int quarterTurns(BoardSide side) {
         switch (side) {
             case BoardSide::BOTTOM: return 0;
@@ -33,8 +37,18 @@ namespace {
         return 0;
     }
 
+    int textQuarterTurns(BoardSide side) {
+        switch (side) {
+            case BoardSide::BOTTOM: return 0;
+            case BoardSide::RIGHT: return 3;
+            case BoardSide::TOP: return 2;
+            case BoardSide::LEFT: return 1;
+        }
+        return 0;
+    }
+
     float textRotation(BoardSide side) {
-        return static_cast<float>(quarterTurns(side) * 90);
+        return static_cast<float>(textQuarterTurns(side) * 90);
     }
 
     Vector2 logicalSize(const Rectangle& bounds, BoardSide side) {
@@ -277,6 +291,82 @@ namespace {
         };
     }
 
+    Rectangle snapRect(const Rectangle& rect) {
+        const float x = std::round(rect.x);
+        const float y = std::round(rect.y);
+        const float right = std::round(rect.x + rect.width);
+        const float bottom = std::round(rect.y + rect.height);
+        return Rectangle{
+            x,
+            y,
+            std::max(0.f, right - x),
+            std::max(0.f, bottom - y),
+        };
+    }
+
+    void drawRectOutline(const Rectangle& rect, float thickness, RaylibColor color) {
+        const Rectangle snapped = snapRect(rect);
+        const float t = std::max(1.f, std::round(thickness));
+        if (snapped.width <= 0.f || snapped.height <= 0.f) {
+            return;
+        }
+
+        DrawRectangleRec(Rectangle{snapped.x, snapped.y, snapped.width, t}, color);
+        DrawRectangleRec(Rectangle{snapped.x, snapped.y + snapped.height - t, snapped.width, t}, color);
+        DrawRectangleRec(Rectangle{snapped.x, snapped.y + t, t, std::max(0.f, snapped.height - t * 2.f)}, color);
+        DrawRectangleRec(Rectangle{snapped.x + snapped.width - t, snapped.y + t, t, std::max(0.f, snapped.height - t * 2.f)}, color);
+    }
+
+    void drawStripDivider(const Rectangle& strip, BoardSide side, float thickness, RaylibColor color) {
+        const Rectangle snapped = snapRect(strip);
+        const float t = std::max(1.f, std::round(thickness));
+        switch (side) {
+            case BoardSide::BOTTOM:
+                DrawRectangleRec(Rectangle{snapped.x, snapped.y + snapped.height - t, snapped.width, t}, color);
+                break;
+            case BoardSide::TOP:
+                DrawRectangleRec(Rectangle{snapped.x, snapped.y, snapped.width, t}, color);
+                break;
+            case BoardSide::LEFT:
+                DrawRectangleRec(Rectangle{snapped.x, snapped.y, t, snapped.height}, color);
+                break;
+            case BoardSide::RIGHT:
+                DrawRectangleRec(Rectangle{snapped.x + snapped.width - t, snapped.y, t, snapped.height}, color);
+                break;
+        }
+    }
+
+    float tileInset(const Rectangle& bounds) {
+        (void)bounds;
+        return 0.f;
+    }
+
+    Rectangle propertyStripLocalRect(const Vector2& logical, BoardSide side, float stripDepth) {
+        if (stripStartsAtLeadingEdge(side)) {
+            return Rectangle{0.f, 0.f, logical.x, stripDepth};
+        }
+        return Rectangle{0.f, logical.y - stripDepth, logical.x, stripDepth};
+    }
+
+    Rectangle flowRect(const Vector2& logical,
+                       BoardSide side,
+                       float stripDepth,
+                       float x,
+                       float innerOffset,
+                       float width,
+                       float height) {
+        if (stripStartsAtLeadingEdge(side)) {
+            return Rectangle{x, stripDepth + innerOffset, width, height};
+        }
+        return Rectangle{x, logical.y - stripDepth - innerOffset - height, width, height};
+    }
+
+    void drawTileShell(Rectangle /*bounds*/, Rectangle inner, RaylibColor fill, RaylibColor /*border*/) {
+        const Rectangle shell = snapRect(inner);
+        DrawRectangleRec(shell, fill);
+        drawRectOutline(shell, 1.f, makeColor(0x10, 0x12, 0x16));
+    }
+
     void drawRailroadIcon(const Rectangle& rect, RaylibColor accent) {
         const float trackY1 = rect.y + rect.height * 0.32f;
         const float trackY2 = rect.y + rect.height * 0.68f;
@@ -436,7 +526,73 @@ namespace {
         }
     }
 
-    void drawSpecialIcon(const TileData& tile, const Rectangle& rect) {
+    const char* tileLogoPath(const TileData& tile) {
+        switch (tile.type) {
+            case TileType::RAILROAD:
+                return "assets/components/tile/railroad.png";
+            case TileType::UTILITY:
+                if (tile.code == "PAM") {
+                    return "assets/components/tile/water_works.png";
+                }
+                return "assets/components/tile/electricity.png";
+            case TileType::CHANCE:
+                return "assets/components/tile/chance.png";
+            case TileType::COMMUNITY_CHEST:
+                return "assets/components/tile/community_chest.png";
+            case TileType::FESTIVAL:
+                return "assets/components/tile/festival.png";
+            case TileType::TAX_PPH:
+            case TileType::TAX_PBM:
+                return "assets/components/tile/tax.png";
+            case TileType::GO:
+                return "assets/components/tile/go.png";
+            case TileType::JAIL:
+                return "assets/components/tile/jail_just_visiting.png";
+            case TileType::FREE_PARKING:
+                return "assets/components/tile/free_parking.png";
+            case TileType::GO_TO_JAIL:
+                return "assets/components/tile/go_to_jail.png";
+            default:
+                return nullptr;
+        }
+    }
+
+    bool drawTileLogo(const TileData& tile, const Rectangle& rect, BoardSide side) {
+        const char* path = tileLogoPath(tile);
+        if (!path) {
+            return false;
+        }
+
+        const Texture2D* tex = AssetManager::get().texture(path);
+        if (!tex || tex->id == 0) {
+            return false;
+        }
+
+        const float scale = std::min(rect.width / static_cast<float>(tex->width),
+                                     rect.height / static_cast<float>(tex->height));
+        const float drawW = static_cast<float>(tex->width) * scale;
+        const float drawH = static_cast<float>(tex->height) * scale;
+        const Rectangle dest{
+            rect.x + rect.width * 0.5f,
+            rect.y + rect.height * 0.5f,
+            drawW,
+            drawH,
+        };
+
+        DrawTexturePro(*tex,
+                       Rectangle{0.f, 0.f, static_cast<float>(tex->width), static_cast<float>(tex->height)},
+                       dest,
+                       Vector2{drawW * 0.5f, drawH * 0.5f},
+                       textRotation(side),
+                       RL_WHITE);
+        return true;
+    }
+
+    void drawSpecialIcon(const TileData& tile, const Rectangle& rect, BoardSide side) {
+        if (drawTileLogo(tile, rect, side)) {
+            return;
+        }
+
         const RaylibColor accent = typeAccent(tile);
         switch (tile.type) {
             case TileType::RAILROAD:
@@ -508,32 +664,156 @@ namespace {
                    makeColor(0xff, 0xc7, 0xc7));
     }
 
+    int ownershipVisualLevel(const TileData& tile) {
+        if (!tile.isOwnable || tile.propertyStatus == PropertyStatus::BANK || tile.ownerName.empty()) {
+            return 0;
+        }
+        if (tile.type != TileType::STREET) {
+            return 1;
+        }
+        if (tile.hasHotel || tile.buildingLevel >= 4) {
+            return 5;
+        }
+        return std::clamp(tile.buildingLevel + 1, 1, 4);
+    }
+
+    const char* buildingMarkerPath(const TileData& tile, bool hotel) {
+        switch (tile.ownerColorIndex) {
+            case 0:
+                return hotel ? "assets/components/houses/hotel_red.png"
+                             : "assets/components/houses/house_red.png";
+            case 1:
+                return hotel ? "assets/components/houses/hotel_yellow.png"
+                             : "assets/components/houses/house_yellow.png";
+            case 2:
+                return hotel ? "assets/components/houses/hotel_blue.png"
+                             : "assets/components/houses/house_blue.png";
+            case 3:
+                return hotel ? "assets/components/houses/hotel_green.png"
+                             : "assets/components/houses/house_green.png";
+            default:
+                return nullptr;
+        }
+    }
+
+    RaylibColor ownerMarkerColor(const TileData& tile) {
+        switch (tile.ownerColorIndex) {
+            case 0: return makeColor(0xe3, 0x4b, 0x4b);
+            case 1: return makeColor(0xf4, 0xd3, 0x1c);
+            case 2: return makeColor(0x41, 0x8d, 0xff);
+            case 3: return makeColor(0x32, 0xc4, 0x71);
+            default: return makeColor(0x3f, 0xbf, 0x73);
+        }
+    }
+
+    void drawFallbackBuildingMarker(const TileData& tile,
+                                    const Rectangle& logicalRect,
+                                    const Rectangle& bounds,
+                                    BoardSide side,
+                                    bool hotel) {
+        const RaylibColor fill = ownerMarkerColor(tile);
+        const RaylibColor outline = makeColor(
+            static_cast<unsigned char>(std::max(25, static_cast<int>(fill.r) - 90)),
+            static_cast<unsigned char>(std::max(25, static_cast<int>(fill.g) - 90)),
+            static_cast<unsigned char>(std::max(25, static_cast<int>(fill.b) - 90)));
+
+        const Rectangle bodyLocal{
+            logicalRect.x + logicalRect.width * (hotel ? 0.15f : 0.18f),
+            logicalRect.y + logicalRect.height * (hotel ? 0.34f : 0.40f),
+            logicalRect.width * (hotel ? 0.70f : 0.64f),
+            logicalRect.height * (hotel ? 0.46f : 0.38f),
+        };
+        const Rectangle roofBaseLocal{
+            logicalRect.x + logicalRect.width * (hotel ? 0.10f : 0.12f),
+            logicalRect.y + logicalRect.height * (hotel ? 0.34f : 0.42f),
+            logicalRect.width * (hotel ? 0.80f : 0.76f),
+            logicalRect.height * (hotel ? 0.22f : 0.26f),
+        };
+
+        const Rectangle body = mapLogicalRect(bodyLocal, bounds, side);
+        DrawRectangleRec(body, fill);
+        drawRectOutline(body, 1.f, outline);
+
+        const Vector2 roofLeft = mapLogicalPoint(
+            Vector2{roofBaseLocal.x, roofBaseLocal.y + roofBaseLocal.height}, bounds, side);
+        const Vector2 roofPeak = mapLogicalPoint(
+            Vector2{roofBaseLocal.x + roofBaseLocal.width * 0.5f, roofBaseLocal.y}, bounds, side);
+        const Vector2 roofRight = mapLogicalPoint(
+            Vector2{roofBaseLocal.x + roofBaseLocal.width, roofBaseLocal.y + roofBaseLocal.height}, bounds, side);
+        DrawTriangle(roofLeft, roofPeak, roofRight, fill);
+        DrawLineEx(roofLeft, roofPeak, 1.2f, outline);
+        DrawLineEx(roofPeak, roofRight, 1.2f, outline);
+        DrawLineEx(roofRight, roofLeft, 1.2f, outline);
+    }
+
+    void drawBuildingMarker(const TileData& tile,
+                            const Rectangle& logicalRect,
+                            const Rectangle& bounds,
+                            BoardSide side,
+                            bool hotel) {
+        const char* path = buildingMarkerPath(tile, hotel);
+        if (path) {
+            const Texture2D* tex = AssetManager::get().texture(path);
+            if (tex && tex->id > 0) {
+                const Rectangle mappedRect = mapLogicalRect(logicalRect, bounds, side);
+                const float scale = std::min(mappedRect.width / static_cast<float>(tex->width),
+                                             mappedRect.height / static_cast<float>(tex->height));
+                const float drawW = static_cast<float>(tex->width) * scale;
+                const float drawH = static_cast<float>(tex->height) * scale;
+                const Rectangle dest{
+                    mappedRect.x + mappedRect.width * 0.5f,
+                    mappedRect.y + mappedRect.height * 0.5f,
+                    drawW,
+                    drawH,
+                };
+                DrawTexturePro(*tex,
+                               Rectangle{0.f, 0.f, static_cast<float>(tex->width), static_cast<float>(tex->height)},
+                               dest,
+                               Vector2{drawW * 0.5f, drawH * 0.5f},
+                               textRotation(side),
+                               RL_WHITE);
+                return;
+            }
+        }
+
+        drawFallbackBuildingMarker(tile, logicalRect, bounds, side, hotel);
+    }
+
     void drawHouseMarkers(const TileData& tile,
                           const Rectangle& bounds,
                           BoardSide side,
                           const Rectangle& logicalRect) {
-        if (!tile.isOwnable || tile.buildingLevel <= 0) {
+        const int visualLevel = ownershipVisualLevel(tile);
+        if (visualLevel <= 0) {
             return;
         }
 
-        const int markers = tile.hasHotel ? 1 : std::min(4, tile.houseCount);
-        const float gap = 4.f;
+        const bool showHotel = visualLevel >= 5;
+        const int markers = showHotel ? 1 : visualLevel;
+        const float gap = std::clamp(logicalRect.width * 0.04f, 2.f, 4.f);
+        const float markerHeight = logicalRect.height;
 
-        if (tile.hasHotel) {
-            const Rectangle hotel = mapLogicalRect(logicalRect, bounds, side);
-            DrawRectangleRounded(hotel, 0.18f, 6, makeColor(0xff, 0x82, 0x78));
-            DrawRectangleLinesEx(hotel, 1.2f, makeColor(0x91, 0x2d, 0x2d));
+        if (showHotel) {
+            const float hotelWidth = std::min(logicalRect.width * 0.50f, markerHeight * 1.75f);
+            const Rectangle hotelRect{
+                logicalRect.x + logicalRect.width * 0.5f - hotelWidth * 0.5f,
+                logicalRect.y,
+                hotelWidth,
+                markerHeight,
+            };
+            drawBuildingMarker(tile, hotelRect, bounds, side, true);
             return;
         }
 
-        const float markerWidth =
-            std::min(12.f, (logicalRect.width - gap * static_cast<float>(markers - 1)) / static_cast<float>(markers));
+        const float availableWidth = std::max(0.f, logicalRect.width - gap * static_cast<float>(markers - 1));
+        const float markerWidth = std::min(markerHeight * 0.94f,
+                                           availableWidth / static_cast<float>(markers));
         const float totalWidth = markerWidth * static_cast<float>(markers) + gap * static_cast<float>(markers - 1);
+        const float y = logicalRect.y + std::max(0.f, (logicalRect.height - markerHeight) * 0.5f);
         float x = logicalRect.x + logicalRect.width * 0.5f - totalWidth * 0.5f;
         for (int i = 0; i < markers; ++i) {
-            const Rectangle house = mapLogicalRect(Rectangle{x, logicalRect.y, markerWidth, logicalRect.height}, bounds, side);
-            DrawRectangleRounded(house, 0.18f, 4, makeColor(0x34, 0xc7, 0x74));
-            DrawRectangleLinesEx(house, 1.f, makeColor(0x13, 0x61, 0x35));
+            const Rectangle houseRect{x, y, markerWidth, markerHeight};
+            drawBuildingMarker(tile, houseRect, bounds, side, false);
             x += markerWidth + gap;
         }
     }
@@ -634,64 +914,68 @@ void drawPropertyTile(const TileData& tile, Rectangle bounds, BoardSide side) {
     const Font& labelFont = am.font("regular");
     const RaylibColor fill = tileFillColor(tile);
     const RaylibColor border = tileBorderColor(tile);
+    const RaylibColor frameBorder = makeColor(0x10, 0x12, 0x16);
     const RaylibColor accent = typeAccent(tile);
     const Vector2 logical = logicalSize(bounds, side);
     const float pad = std::clamp(std::min(logical.x, logical.y) * 0.10f, 6.f, 16.f);
     const float stripDepth = std::clamp(logical.y * 0.18f, 10.f, 24.f);
-    const float codeHeight = std::clamp(logical.y * 0.16f, 10.f, 20.f);
-    const Rectangle inner = insetRect(bounds, 1.2f);
-    const float bodyTop = pad + codeHeight + 4.f;
-    const float bodyHeight = std::max(18.f, logical.y - stripDepth - bodyTop - pad * 0.7f);
+    const Rectangle inner = snapRect(insetRect(bounds, tileInset(bounds)));
+    const float contentSpan = std::max(24.f, logical.y - stripDepth);
+    const float bodyHeight = std::max(18.f, contentSpan - pad * 1.7f);
 
-    DrawRectangleRec(bounds, makeColor(0x07, 0x0d, 0x18, 180));
-    DrawRectangleRounded(inner, 0.08f, 8, fill);
-    DrawRectangleLinesEx(inner, 1.4f, border);
+    drawTileShell(bounds, inner, fill, border);
 
-    const Rectangle strip = mapLogicalRect(Rectangle{0.f, logical.y - stripDepth, logical.x, stripDepth}, inner, side);
+    const Rectangle stripLocalRect = propertyStripLocalRect(logical, side, stripDepth);
+    const Rectangle strip = snapRect(mapLogicalRect(stripLocalRect, inner, side));
     DrawRectangleRec(strip, accent);
+    drawStripDivider(strip, side, 1.f, frameBorder);
+    drawRectOutline(inner, 1.f, frameBorder);
 
-    const Rectangle codeRectLocal{
-        pad,
-        pad,
-        std::max(28.f, logical.x * 0.36f),
-        codeHeight,
-    };
-    const Rectangle codeRect = mapLogicalRect(codeRectLocal, inner, side);
-    DrawRectangleRounded(codeRect, 0.22f, 6, makeColor(accent.r, accent.g, accent.b, 30));
-    DrawRectangleLinesEx(codeRect, 1.f, makeColor(accent.r, accent.g, accent.b, 120));
     drawTextBlock(labelFont,
                   tile.code,
-                  std::clamp(codeHeight * 0.65f, 9.f, 16.f),
-                  border,
-                  codeRectLocal,
+                  std::clamp(stripDepth * 0.52f, 7.f, 13.f),
+                  makeColor(255, 255, 255, 220),
+                  stripLocalRect,
                   inner,
                   side,
                   1);
 
     if (tile.type == TileType::RAILROAD || tile.type == TileType::UTILITY) {
-        const Rectangle iconRect = mapLogicalRect(Rectangle{
-            logical.x * 0.25f,
-            bodyTop,
-            logical.x * 0.50f,
-            std::min(bodyHeight * 0.34f, logical.y * 0.28f),
-        }, inner, side);
-        drawSpecialIcon(tile, iconRect);
+        const Rectangle iconRect = mapLogicalRect(
+            flowRect(logical,
+                     side,
+                     stripDepth,
+                     logical.x * 0.25f,
+                     pad,
+                     logical.x * 0.50f,
+                     std::min(bodyHeight * 0.34f, logical.y * 0.28f)),
+            inner,
+            side);
+        drawSpecialIcon(tile, iconRect, side);
     }
 
     const float titleFontSize = std::clamp(std::min(logical.x, logical.y) * 0.16f, 10.f, 18.f);
     const float subtitleFontSize = std::clamp(titleFontSize * 0.72f, 8.f, 13.f);
     const float priceFontSize = std::clamp(titleFontSize * 0.78f, 8.f, 14.f);
+    const float priceHeight = priceFontSize * 1.4f;
+    const float markerHeight = std::clamp(logical.y * 0.15f, 10.f, 18.f);
+    const float badgeSize = std::clamp(std::min(logical.x, logical.y) * 0.15f, 10.f, 18.f);
+    const float priceOffset = std::max(pad, contentSpan - pad - priceHeight);
+    const float markerGap = std::clamp(logical.y * 0.03f, 2.f, 5.f);
+    const float markerOffset = std::max(pad + bodyHeight * 0.34f,
+                                        priceOffset - markerHeight - markerGap);
 
     drawTextBlock(titleFont,
                   tile.name,
                   titleFontSize,
                   makeColor(0x1f, 0x28, 0x37),
-                  Rectangle{
-                      pad,
-                      bodyTop + (tile.type == TileType::STREET ? 0.f : logical.y * 0.12f),
-                      logical.x - pad * 2.f,
-                      bodyHeight * 0.48f,
-                  },
+                  flowRect(logical,
+                           side,
+                           stripDepth,
+                           pad,
+                           pad + (tile.type == TileType::STREET ? 0.f : contentSpan * 0.12f),
+                           logical.x - pad * 2.f,
+                           bodyHeight * 0.48f),
                   inner,
                   side,
                   tile.type == TileType::STREET ? 2 : 1);
@@ -701,12 +985,13 @@ void drawPropertyTile(const TileData& tile, Rectangle bounds, BoardSide side) {
                       tile.subtitle,
                       subtitleFontSize,
                       makeColor(0x6f, 0x7a, 0x89),
-                      Rectangle{
-                          pad,
-                          bodyTop + bodyHeight * 0.42f,
-                          logical.x - pad * 2.f,
-                          bodyHeight * 0.18f,
-                      },
+                      flowRect(logical,
+                               side,
+                               stripDepth,
+                               pad,
+                               pad + bodyHeight * 0.42f,
+                               logical.x - pad * 2.f,
+                               bodyHeight * 0.18f),
                       inner,
                       side,
                       1);
@@ -718,12 +1003,13 @@ void drawPropertyTile(const TileData& tile, Rectangle bounds, BoardSide side) {
                       price,
                       priceFontSize,
                       makeColor(0x15, 0x53, 0x34),
-                      Rectangle{
-                          logical.x * 0.18f,
-                          logical.y - stripDepth - pad - priceFontSize * 1.3f,
-                          logical.x * 0.64f,
-                          priceFontSize * 1.4f,
-                      },
+                      flowRect(logical,
+                               side,
+                               stripDepth,
+                               logical.x * 0.18f,
+                               priceOffset,
+                               logical.x * 0.64f,
+                               priceHeight),
                       inner,
                       side,
                       1);
@@ -732,22 +1018,24 @@ void drawPropertyTile(const TileData& tile, Rectangle bounds, BoardSide side) {
     drawHouseMarkers(tile,
                      inner,
                      side,
-                     Rectangle{
-                         logical.x * 0.18f,
-                         logical.y - stripDepth - pad * 1.25f,
-                         logical.x * 0.64f,
-                         std::clamp(logical.y * 0.10f, 7.f, 14.f),
-                     });
+                     flowRect(logical,
+                              side,
+                              stripDepth,
+                              logical.x * 0.16f,
+                              markerOffset,
+                              logical.x * 0.68f,
+                              markerHeight));
 
     drawStatusBadge(tile,
                     inner,
                     side,
-                    Rectangle{
-                        logical.x - pad - codeHeight,
-                        pad,
-                        codeHeight,
-                        codeHeight,
-                    });
+                    flowRect(logical,
+                             side,
+                             stripDepth,
+                             logical.x - pad - badgeSize,
+                             pad * 0.55f,
+                             badgeSize,
+                             badgeSize));
 }
 
 void drawSpecialTile(const TileData& tile, Rectangle bounds, BoardSide side) {
@@ -761,43 +1049,49 @@ void drawSpecialTile(const TileData& tile, Rectangle bounds, BoardSide side) {
     const float pad = std::clamp(std::min(logical.x, logical.y) * 0.10f, 7.f, 18.f);
     const float titleFontSize = std::clamp(std::min(logical.x, logical.y) * (isCornerType(tile.type) ? 0.18f : 0.15f), 10.f, 22.f);
     const float subtitleFontSize = std::clamp(titleFontSize * 0.68f, 8.f, 13.f);
-    const Rectangle inner = insetRect(bounds, 1.2f);
+    const Rectangle inner = snapRect(insetRect(bounds, tileInset(bounds)));
     const float badgeHeight = std::clamp(logical.y * 0.16f, 10.f, 24.f);
 
-    DrawRectangleRec(bounds, makeColor(0x07, 0x0d, 0x18, 180));
-    DrawRectangleRounded(inner, 0.08f, 8, fill);
-    DrawRectangleLinesEx(inner, 1.4f, border);
+    drawTileShell(bounds, inner, fill, border);
 
-    const Rectangle badge = mapLogicalRect(Rectangle{pad, pad, logical.x - pad * 2.f, badgeHeight}, inner, side);
-    DrawRectangleRounded(badge, 0.22f, 6, makeColor(accent.r, accent.g, accent.b, 26));
-    DrawRectangleLinesEx(badge, 1.f, makeColor(accent.r, accent.g, accent.b, 100));
+    const Rectangle badge = mapLogicalRect(
+        flowRect(logical, side, 0.f, pad, pad, logical.x - pad * 2.f, badgeHeight),
+        inner,
+        side);
+    DrawRectangleRec(badge, makeColor(accent.r, accent.g, accent.b, 26));
+    drawRectOutline(badge, 1.f, makeColor(accent.r, accent.g, accent.b, 100));
     drawTextBlock(labelFont,
                   tile.code,
                   std::clamp(badgeHeight * 0.62f, 8.f, 15.f),
                   accent,
-                  Rectangle{pad, pad, logical.x - pad * 2.f, badgeHeight},
+                  flowRect(logical, side, 0.f, pad, pad, logical.x - pad * 2.f, badgeHeight),
                   inner,
                   side,
                   1);
 
-    const Rectangle iconRect = mapLogicalRect(Rectangle{
-        logical.x * 0.18f,
-        pad + badgeHeight + pad * 0.5f,
-        logical.x * 0.64f,
-        logical.y * (isCornerType(tile.type) ? 0.34f : 0.28f),
-    }, inner, side);
-    drawSpecialIcon(tile, iconRect);
+    const Rectangle iconRect = mapLogicalRect(
+        flowRect(logical,
+                 side,
+                 0.f,
+                 logical.x * 0.18f,
+                 pad + badgeHeight + pad * 0.5f,
+                 logical.x * 0.64f,
+                 logical.y * (isCornerType(tile.type) ? 0.34f : 0.28f)),
+        inner,
+        side);
+    drawSpecialIcon(tile, iconRect, side);
 
     drawTextBlock(titleFont,
                   tile.name,
                   titleFontSize,
                   makeColor(0x1e, 0x2b, 0x3d),
-                  Rectangle{
-                      pad,
-                      logical.y * (isCornerType(tile.type) ? 0.52f : 0.48f),
-                      logical.x - pad * 2.f,
-                      logical.y * 0.22f,
-                  },
+                  flowRect(logical,
+                           side,
+                           0.f,
+                           pad,
+                           logical.y * (isCornerType(tile.type) ? 0.52f : 0.48f),
+                           logical.x - pad * 2.f,
+                           logical.y * 0.22f),
                   inner,
                   side,
                   isCornerType(tile.type) ? 2 : 1);
@@ -807,12 +1101,13 @@ void drawSpecialTile(const TileData& tile, Rectangle bounds, BoardSide side) {
                       tile.subtitle,
                       subtitleFontSize,
                       makeColor(0x5f, 0x6e, 0x83),
-                      Rectangle{
-                          pad,
-                          logical.y * 0.76f,
-                          logical.x - pad * 2.f,
-                          logical.y * 0.12f,
-                      },
+                      flowRect(logical,
+                               side,
+                               0.f,
+                               pad,
+                               logical.y * 0.76f,
+                               logical.x - pad * 2.f,
+                               logical.y * 0.12f),
                       inner,
                       side,
                       1);
@@ -825,12 +1120,13 @@ void drawSpecialTile(const TileData& tile, Rectangle bounds, BoardSide side) {
                           price,
                           subtitleFontSize,
                           makeColor(0x8e, 0x2d, 0x2d),
-                          Rectangle{
-                              logical.x * 0.20f,
-                              logical.y * 0.86f,
-                              logical.x * 0.60f,
-                              logical.y * 0.08f,
-                          },
+                          flowRect(logical,
+                                   side,
+                                   0.f,
+                                   logical.x * 0.20f,
+                                   logical.y * 0.86f,
+                                   logical.x * 0.60f,
+                                   logical.y * 0.08f),
                           inner,
                           side,
                           1);

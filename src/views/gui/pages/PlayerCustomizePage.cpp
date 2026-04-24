@@ -23,14 +23,14 @@ void GUIView::drawCustPlayer() {
     gui::draw::drawCenteredText(am, "title", "Customize Player", H * 0.042f, RL_WHITE, H * 0.10f);
     gui::draw::drawMenuButton(am, "< Back", layout.backButton, hoveredItem_ == 20, false);
 
-    gui::draw::drawPanel(layout.sidePanel, gui::menu::makeColor(6, 12, 24, 170));
-    gui::draw::drawPanel(layout.mainPanel, gui::menu::makeColor(6, 12, 24, 190));
-
     for (int i = 0; i < setup_.numPlayers; ++i) {
         const Rectangle tabRect = gui::menu::playerTabRect(layout, i);
         const bool selected = (i == playerIndex);
         const bool hovered = (hoveredItem_ == 100 + i);
-        const RaylibColor accent = gui::menu::setupPalette()[static_cast<size_t>(gui::menu::selectedPlayerColor(setup_, i))];
+        const int selectedTabColor = gui::menu::selectedPlayerColor(setup_, i);
+        const RaylibColor accent = selectedTabColor >= 0
+            ? gui::menu::setupPalette()[static_cast<size_t>(selectedTabColor)]
+            : gui::menu::makeColor(0x86, 0x93, 0xa7);
         const RaylibColor fill = selected ? gui::menu::makeColor(accent.r, accent.g, accent.b, 58)
                                           : hovered ? gui::menu::makeColor(255, 255, 255, 28)
                                                     : gui::menu::makeColor(255, 255, 255, 12);
@@ -128,6 +128,18 @@ void GUIView::drawCustPlayer() {
                    0.f,
                    taken && !selected ? gui::menu::makeColor(120, 128, 142)
                                       : gui::menu::makeColor(222, 228, 238));
+    }
+
+    if (selectedColor < 0) {
+        const std::string hint = "belum dipilih";
+        const float hintSize = H * 0.017f;
+        const Vector2 hintMeasure = MeasureTextEx(am.font("regular"), hint.c_str(), hintSize, 0.f);
+        DrawTextEx(am.font("regular"),
+                   hint.c_str(),
+                   Vector2{layout.mainPanel.x + layout.mainPanel.width - hintMeasure.x - 28.f, layout.colorLabelY + 2.f},
+                   hintSize,
+                   0.f,
+                   gui::menu::makeColor(150, 162, 180));
     }
 
     gui::draw::drawLabel(am, "bold", "Character", H * 0.024f, gui::menu::makeColor(236, 241, 250),

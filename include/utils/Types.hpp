@@ -92,6 +92,7 @@ public:
     string subtitle;
     PropertyStatus propertyStatus{PropertyStatus::BANK};
     string ownerName;
+    int ownerColorIndex{-1};
     bool isOwnable{false};
     bool isMortgaged{false};
     int buildingLevel{0};

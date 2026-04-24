@@ -6,7 +6,6 @@
 #include <string>
 #include <vector>
 
-#if NIMONSPOLY_ENABLE_RAYLIB
 #include "core/TextFileRepository.hpp"
 #include "core/engine/header/GameEngine.hpp"
 #include "core/state/header/GameStateView.hpp"
@@ -19,17 +18,9 @@
 #include "ui/GUIInput.hpp"
 #include "ui/GUIView.hpp"
 #include "ui/RaylibCompat.hpp"
-#else
-#include "controllers/HumanController.hpp"
-#include "core/TextFileRepository.hpp"
-#include "core/engine/header/GameEngine.hpp"
-#include "models/Money.hpp"
-#include "models/Player.hpp"
-#include "ui/ConsoleInput.hpp"
-#endif
+#include "views/gui/GuiMenuLayout.hpp"
 
 int main() {
-#if NIMONSPOLY_ENABLE_RAYLIB
     SetConfigFlags(FLAG_WINDOW_RESIZABLE | FLAG_VSYNC_HINT);
     InitWindow(1440, 1024, "NIMONSPOLY");
     SetTargetFPS(60);
@@ -56,6 +47,7 @@ int main() {
         BeginDrawing();
         if (view.screen() == AppScreen::IN_GAME && gameInitialized) {
             state.refresh(engine.getState(), &engine.getBoard());
+            view.showTransactionLog(engine.getTransactionLogger().getFullLog());
             view.setCurrentPrompt(&input.currentPrompt());
             view.showBoard(state);
         } else {
@@ -71,6 +63,7 @@ int main() {
         ownedControllers.clear();
         players.clear();
         pendingCommand.clear();
+        gui::menu::finalizeSetupPlayers(view.setup());
 
         ownedPlayers.reserve(static_cast<size_t>(view.setup().numPlayers));
         ownedControllers.reserve(static_cast<size_t>(view.setup().numPlayers));
@@ -230,6 +223,19 @@ int main() {
             } else if (!pendingCommand.empty()) {
                 if (pendingCommand == "DADU" && view.isDiceAnimating()) {
                     // Wait until the overlay animation finishes.
+                } else if (pendingCommand == "ATUR_DADU") {
+                    const auto [d1, d2] = input.getManualDice();
+                    if (d1 > 0 && d2 > 0) {
+                        engine.processCommand(
+                            "atur dadu " + std::to_string(d1) + " " + std::to_string(d2),
+                            *active);
+                        view.setQueuedManualDice(d1, d2);
+                        view.showSaveLoadStatus(
+                            "Roll berikutnya diatur ke " + std::to_string(d1) + " + " + std::to_string(d2) + ".");
+                    } else {
+                        view.showSaveLoadStatus("Atur dadu dibatalkan.");
+                    }
+                    pendingCommand.clear();
                 } else if (pendingCommand == "SIMPAN") {
                     std::string path = input.getString("Nama berkas simpanan");
                     if (path.empty()) {
@@ -245,6 +251,8 @@ int main() {
                     pendingCommand.clear();
                 } else if (pendingCommand == "DADU") {
                     engine.processCommand("lempar", *active);
+                    view.showDiceResult(engine.getDice().getDie1(), engine.getDice().getDie2(), active->getUsername());
+                    view.clearQueuedManualDice();
                     pendingCommand.clear();
                 } else if (pendingCommand == "TEBUS") {
                     std::string code = input.getPropertyCodeInput("Kode properti untuk tebus");
@@ -293,137 +301,4 @@ int main() {
     AssetManager::get().unloadAll();
     CloseWindow();
     return EXIT_SUCCESS;
-#else
-    ConsoleInput input;
-    HumanController controller(&input);
-    GameEngine engine;
-    TextFileRepository repo;
-    engine.setRepository(&repo);
-    engine.loadConfiguration("config");
-
-    std::cout << "1. Permainan baru\n2. Muat simpanan\n";
-    const int menu = input.getNumberInRange("Pilihan", 1, 2);
-
-    std::vector<std::unique_ptr<Player>> ownedPlayers;
-    std::vector<Player*> players;
-    std::string loadPath;
-
-    if (menu == 2) {
-        loadPath = input.getString("Nama berkas simpanan");
-        if (loadPath.empty()) {
-            loadPath = "nimonspoli_save.txt";
-        }
-        if (!repo.exists(loadPath)) {
-            std::cout << "Berkas tidak ditemukan.\n";
-            return EXIT_FAILURE;
-        }
-        const std::vector<std::string> names = repo.getPlayerNames(loadPath);
-        if (names.empty()) {
-            std::cout << "Simpanan tidak valid.\n";
-            return EXIT_FAILURE;
-        }
-        ownedPlayers.reserve(names.size());
-        players.reserve(names.size());
-        for (const std::string& name : names) {
-            const std::string useName = name.empty() ? "P" + std::to_string(players.size() + 1) : name;
-            ownedPlayers.push_back(std::make_unique<Player>(useName, Money(engine.getConfig().getStartingMoney()),
-                &controller));
-            players.push_back(ownedPlayers.back().get());
-        }
-        engine.initialize(players, engine.getConfig().getMaxTurns());
-        engine.start();
-        if (!engine.loadGame(loadPath)) {
-            std::cout << "Gagal memuat simpanan.\n";
-            return EXIT_FAILURE;
-        }
-    } else {
-        const int playerCount = input.getNumberInRange("Jumlah pemain", 2, 4);
-        ownedPlayers.reserve(playerCount);
-        players.reserve(playerCount);
-
-        for (int i = 0; i < playerCount; ++i) {
-            const std::string name = input.getString("Nama pemain " + std::to_string(i + 1));
-            ownedPlayers.push_back(std::make_unique<Player>(name.empty() ? "P" + std::to_string(i + 1) : name,
-                                                            Money(engine.getConfig().getStartingMoney()),
-                                                            &controller));
-            players.push_back(ownedPlayers.back().get());
-        }
-
-        std::random_device rd;
-        std::mt19937 g(rd());
-        std::shuffle(players.begin(), players.end(), g);
-
-        engine.initialize(players, engine.getConfig().getMaxTurns());
-        engine.start();
-    }
-
-    while (engine.isRunning()) {
-        if (engine.getState().getCurrentTurn() > engine.getState().getMaxTurn()) {
-            engine.stop();
-            break;
-        }
-
-        int activeCount = 0;
-        for (Player* player : players) {
-            if (player && !player->isBankrupt()) {
-                ++activeCount;
-            }
-        }
-        if (activeCount <= 1) {
-            engine.stop();
-            break;
-        }
-
-        Player* active = engine.getState().getActivePlayer();
-        if (!active) {
-            engine.stop();
-            break;
-        }
-        if (active->isBankrupt()) {
-            engine.processCommand("SELESAI", *active);
-            continue;
-        }
-
-        std::cout << "\nTurn " << engine.getState().getCurrentTurn() << "/"
-                  << engine.getState().getMaxTurn() << " - " << active->getUsername()
-                  << " (" << active->getMoney().toString() << ")\n";
-        const std::string command = input.getCommand();
-        if (command == "quit" || command == "QUIT" || command == "keluar") {
-            engine.stop();
-            break;
-        }
-        engine.processCommand(command, *active);
-    }
-
-    std::vector<Player*> survivors;
-    for (Player* p : players) {
-        if (p && !p->isBankrupt()) {
-            survivors.push_back(p);
-        }
-    }
-    std::sort(survivors.begin(), survivors.end(), [](Player* a, Player* b) {
-        if (!a || !b) {
-            return a != nullptr;
-        }
-        const Money wa = a->getTotalWealth();
-        const Money wb = b->getTotalWealth();
-        if (wa.getAmount() != wb.getAmount()) {
-            return wa.getAmount() > wb.getAmount();
-        }
-        return a->getUsername() < b->getUsername();
-    });
-
-    if (survivors.size() == 1) {
-        std::cout << "Pemenang: " << survivors.front()->getUsername() << "\n";
-    } else if (!survivors.empty()) {
-        std::cout << "Permainan berakhir. Peringkat:\n";
-        int r = 1;
-        for (Player* p : survivors) {
-            if (!p) continue;
-            std::cout << r++ << ". " << p->getUsername() << " - " << p->getTotalWealth().toString() << "\n";
-        }
-    }
-
-    return EXIT_SUCCESS;
-#endif
 }

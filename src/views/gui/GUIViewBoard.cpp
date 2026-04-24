@@ -6,6 +6,8 @@
 #if NIMONSPOLY_ENABLE_RAYLIB
 #include <algorithm>
 #include <array>
+#include <cstdio>
+#include <ctime>
 #include <random>
 #include <string>
 #include <vector>
@@ -24,7 +26,6 @@ namespace {
 #if NIMONSPOLY_ENABLE_RAYLIB
 namespace {
     const RaylibColor BG_COLOR = gui::menu::makeColor(0x06, 0x09, 0x12);
-    const RaylibColor PANEL_BG = gui::menu::makeColor(0x08, 0x0c, 0x14);
     const RaylibColor PANEL_BORDER = gui::menu::makeColor(0x5c, 0xd6, 0xff, 40);
     const RaylibColor ACCENT_CYAN = gui::menu::makeColor(0x5c, 0xd6, 0xff);
     const RaylibColor ACCENT_GOLD = gui::menu::makeColor(0xff, 0xc1, 0x07);
@@ -33,6 +34,30 @@ namespace {
     const RaylibColor TEXT_GREEN = gui::menu::makeColor(0x00, 0xd9, 0x8e);
     const RaylibColor BTN_BG = gui::menu::makeColor(0x12, 0x1a, 0x2e);
     const RaylibColor BTN_BORDER = gui::menu::makeColor(0x2a, 0x3f, 0x5c);
+    const RaylibColor SURFACE_BG = gui::menu::makeColor(0x0c, 0x11, 0x19, 235);
+    const RaylibColor SURFACE_ALT = gui::menu::makeColor(0x11, 0x18, 0x24, 245);
+
+    struct InGameLayout {
+        Rectangle summaryPanel;
+        Rectangle leftInputPanel;
+        Rectangle playersPanel;
+        Rectangle boardPanel;
+        Rectangle boardBounds;
+        Rectangle logPanel;
+        Rectangle propertiesPanel;
+        Rectangle actionsPanel;
+    };
+
+    struct ActionLayout {
+        Rectangle diceRect;
+        Rectangle setDiceRect;
+        std::array<Rectangle, 6> buttons;
+        float tipY{0.f};
+    };
+
+    constexpr std::array<const char*, 6> ACTION_LABELS{
+        "TEBUS", "BANGUN", "GADAI", "KARTU", "SIMPAN", "SELESAI"
+    };
 
     std::string setupPlayerName(const SetupState& setup, int playerIndex) {
         if (playerIndex >= 0 &&
@@ -53,7 +78,7 @@ namespace {
     }
 
     int selectedPlayerColor(const SetupState& setup, const std::string& username, int fallbackIndex) {
-        return gui::menu::selectedPlayerColor(
+        return gui::menu::effectivePlayerColor(
             setup, findSetupPlayerIndex(setup, username, fallbackIndex));
     }
 
@@ -86,6 +111,146 @@ namespace {
                    0.f,
                    color);
     }
+
+    Rectangle insetRect(Rectangle rect, float padding) {
+        return Rectangle{
+            rect.x + padding,
+            rect.y + padding,
+            std::max(0.f, rect.width - padding * 2.f),
+            std::max(0.f, rect.height - padding * 2.f),
+        };
+    }
+
+    Rectangle panelBodyRect(Rectangle rect, float headerHeight = 54.f, float padding = 16.f) {
+        return Rectangle{
+            rect.x + padding,
+            rect.y + headerHeight,
+            std::max(0.f, rect.width - padding * 2.f),
+            std::max(0.f, rect.height - headerHeight - padding),
+        };
+    }
+
+    void drawPanelFrame(AssetManager& am,
+                        Rectangle rect,
+                        const std::string& title,
+                        const std::string& subtitle,
+                        RaylibColor fill = SURFACE_BG) {
+        gui::draw::drawPanel(rect, fill, PANEL_BORDER);
+        const Rectangle header{
+            rect.x + 1.f,
+            rect.y + 1.f,
+            rect.width - 2.f,
+            42.f,
+        };
+        DrawRectangleRec(header, gui::menu::makeColor(255, 255, 255, 10));
+        DrawLineEx(Vector2{rect.x + 16.f, rect.y + 43.f},
+                   Vector2{rect.x + rect.width - 16.f, rect.y + 43.f},
+                   1.f,
+                   gui::menu::makeColor(255, 255, 255, 18));
+
+        DrawTextEx(am.font("bold"),
+                   title.c_str(),
+                   Vector2{rect.x + 16.f, rect.y + 10.f},
+                   26.f,
+                   0.f,
+                   TEXT_PRIMARY);
+        if (!subtitle.empty()) {
+            const Vector2 subtitleSize = MeasureTextEx(am.font("regular"), subtitle.c_str(), 16.f, 0.f);
+            DrawTextEx(am.font("regular"),
+                       subtitle.c_str(),
+                       Vector2{rect.x + rect.width - subtitleSize.x - 16.f, rect.y + 14.f},
+                       16.f,
+                       0.f,
+                       TEXT_MUTED);
+        }
+    }
+
+    InGameLayout makeInGameLayout(float screenW, float screenH) {
+        const float margin = std::clamp(std::min(screenW, screenH) * 0.018f, 14.f, 24.f);
+        const float gutter = margin;
+        const float leftW = std::clamp(screenW * 0.19f, 250.f, 320.f);
+        const float rightW = std::clamp(screenW * 0.23f, 300.f, 380.f);
+        const float contentH = screenH - margin * 2.f;
+
+        constexpr float kSummaryH = 88.f;
+        constexpr float kPlayerRowH = 58.f;
+        constexpr float kPanelHeaderH = 56.f;
+        const float playersH = kPanelHeaderH + 4.f * kPlayerRowH + 3.f * 10.f + 14.f;
+        const float inputH = std::max(80.f, contentH - kSummaryH - playersH - gutter * 2.f);
+
+        const float sideTopH    = std::clamp(contentH * 0.55f, 320.f, contentH - 220.f - gutter);
+        const float sideBottomH = contentH - sideTopH - gutter;
+        const float centerTopH    = std::clamp(contentH * 0.70f, 380.f, contentH - 150.f - gutter);
+        const float centerBottomH = contentH - centerTopH - gutter;
+
+        InGameLayout layout{};
+        layout.logPanel = {screenW - margin - rightW, margin, rightW, sideTopH};
+        layout.actionsPanel = {layout.logPanel.x, margin + sideTopH + gutter, rightW, sideBottomH};
+
+        const float centerX = margin + leftW + gutter;
+        const float centerW = layout.logPanel.x - gutter - centerX;
+        layout.boardPanel = {centerX, margin, centerW, centerTopH};
+        layout.propertiesPanel = {centerX, margin + centerTopH + gutter, centerW, centerBottomH};
+
+        layout.summaryPanel = {margin, margin, leftW, kSummaryH};
+        layout.leftInputPanel = {margin, margin + kSummaryH + gutter, leftW, inputH};
+        layout.playersPanel = {margin, margin + kSummaryH + gutter + inputH + gutter, leftW, playersH};
+
+        const Rectangle boardArea = insetRect(layout.boardPanel, 10.f);
+        const float boardSize = std::max(180.f, std::min(boardArea.width, boardArea.height));
+        layout.boardBounds = gui::draw::centeredRect(
+            boardArea.x + boardArea.width * 0.5f,
+            boardArea.y + boardArea.height * 0.5f,
+            boardSize, boardSize);
+
+        return layout;
+    }
+
+    ActionLayout makeActionLayout(Rectangle panelRect) {
+        const Rectangle body = insetRect(panelRect, 14.f);
+        constexpr float kGap = 10.f;
+        constexpr float kTipH = 20.f;
+        constexpr float kTipGap = 6.f;
+
+        const float diceH = std::clamp(body.height * 0.28f, 66.f, 96.f);
+        const float setDiceH = std::clamp(body.height * 0.10f, 30.f, 40.f);
+        const float gridTop = body.y + diceH + kGap + setDiceH + kGap;
+        const float gridH = body.height - diceH - setDiceH - kGap * 2.f - kTipGap - kTipH;
+        const float rowH = std::max(30.f, (gridH - kGap) / 2.f);
+        const float colW = (body.width - kGap * 2.f) / 3.f;
+
+        ActionLayout layout{};
+        layout.diceRect = {body.x, body.y, body.width, diceH};
+        layout.setDiceRect = {body.x, body.y + diceH + kGap, body.width, setDiceH};
+
+        for (int row = 0; row < 2; ++row) {
+            for (int col = 0; col < 3; ++col) {
+                const int i = row * 3 + col;
+                layout.buttons[static_cast<size_t>(i)] = {
+                    body.x + col * (colW + kGap),
+                    gridTop + row * (rowH + kGap),
+                    colW, rowH,
+                };
+            }
+        }
+
+        const float lastRowBottom = gridTop + 2.f * rowH + kGap;
+        layout.tipY = lastRowBottom + kTipGap;
+
+        return layout;
+    }
+
+    std::string currentClockLabel() {
+        const std::time_t now = std::time(nullptr);
+        const std::tm* local = std::localtime(&now);
+        if (!local) {
+            return "--:--";
+        }
+
+        char buffer[16];
+        std::snprintf(buffer, sizeof(buffer), "%02d:%02d", local->tm_hour, local->tm_min);
+        return buffer;
+    }
 }
 #endif
 
@@ -95,39 +260,63 @@ void GUIView::showBoard(const GameStateView& state) {
 
     const float W = static_cast<float>(GetScreenWidth());
     const float H = static_cast<float>(GetScreenHeight());
-    const float globeSize = H;
-    const float globeX = (W - globeSize) * 0.5f;
-    const float globeY = 0.f;
-    const float panelW = (W - globeSize) * 0.5f;
-    const float boardSize = H;
-    const Rectangle boardBounds{(W - boardSize) * 0.5f, 0.f, boardSize, boardSize};
+    const InGameLayout layout = makeInGameLayout(W, H);
 
     ClearBackground(BG_COLOR);
+    DrawRectangleGradientV(0, 0, static_cast<int>(W), static_cast<int>(H),
+                           gui::menu::makeColor(0x10, 0x14, 0x1e),
+                           gui::menu::makeColor(0x06, 0x09, 0x12));
+    DrawCircleGradient(static_cast<int>(W * 0.50f),
+                       static_cast<int>(H * 0.18f),
+                       std::min(W, H) * 0.26f,
+                       gui::menu::makeColor(0x5c, 0xd6, 0xff, 22),
+                       RL_BLANK);
+    DrawCircleGradient(static_cast<int>(W * 0.72f),
+                       static_cast<int>(H * 0.68f),
+                       std::min(W, H) * 0.18f,
+                       gui::menu::makeColor(0xff, 0xc1, 0x07, 12),
+                       RL_BLANK);
+
+    drawLeftPanel(state, layout.summaryPanel, layout.leftInputPanel, layout.playersPanel);
+    drawRightPanel(state, layout.logPanel, layout.actionsPanel);
+    drawPropertyPanel(state, layout.propertiesPanel);
 
     if (const Texture2D* globeTex = am.texture("assets/bg/GlobeWShadow.png")) {
-        gui::draw::drawSprite(globeTex, Rectangle{globeX, globeY, globeSize, globeSize});
+        const float backSize = layout.boardBounds.width * 1.08f;
+        gui::draw::drawSprite(globeTex,
+                              gui::draw::centeredRect(
+                                  layout.boardBounds.x + layout.boardBounds.width * 0.5f,
+                                  layout.boardBounds.y + layout.boardBounds.height * 0.5f,
+                                  backSize, backSize),
+                              gui::menu::makeColor(255, 255, 255, 180));
     }
+    DrawRectangleRounded(insetRect(layout.boardBounds, -8.f), 0.02f, 8, gui::menu::makeColor(0, 0, 0, 70));
 
-    if (const Texture2D* titleTex = am.texture("assets/bg/Title.png")) {
-        const float titleW = W * 0.28f;
-        const float titleH = static_cast<float>(titleTex->height) * (titleW / static_cast<float>(titleTex->width));
-        gui::draw::drawSprite(titleTex, Rectangle{
-            (W - titleW) * 0.5f,
-            (H - titleH) * 0.5f - 20.f,
-            titleW,
-            titleH,
-        });
+    if (const Texture2D* logoTex = am.texture("assets/bg/Title.png")) {
+        const float logoW = layout.boardBounds.width * 0.44f;
+        const float logoH = logoW * static_cast<float>(logoTex->height) / static_cast<float>(logoTex->width);
+        gui::draw::drawSprite(
+            logoTex,
+            gui::draw::centeredRect(layout.boardBounds.x + layout.boardBounds.width * 0.5f,
+                                    layout.boardBounds.y + layout.boardBounds.height * 0.50f,
+                                    logoW,
+                                    logoH),
+            gui::menu::makeColor(255, 255, 255, 165));
     }
 
     const int totalTiles = static_cast<int>(state.tiles.size());
     for (int i = 0; i < totalTiles; ++i) {
-        const Rectangle tileBounds = gui::tile::boardTileBounds(i, boardBounds, totalTiles);
-        gui::tile::drawTile(state.tiles[static_cast<size_t>(i)],
+        const Rectangle tileBounds = gui::tile::boardTileBounds(i, layout.boardBounds, totalTiles);
+        TileData tile = state.tiles[static_cast<size_t>(i)];
+        if (tile.isOwnable && !tile.ownerName.empty()) {
+            tile.ownerColorIndex = selectedPlayerColor(setup_, tile.ownerName, 0);
+        }
+        gui::tile::drawTile(tile,
                             tileBounds,
                             gui::tile::boardSideForIndex(i, totalTiles));
     }
 
-    const float tokenSpacing = boardSize * 0.025f;
+    const float tokenSpacing = layout.boardBounds.width * 0.025f;
     std::vector<std::vector<int>> playersAt(static_cast<size_t>(std::max(0, totalTiles)));
     for (int p = 0; p < static_cast<int>(state.players.size()); ++p) {
         const auto& player = state.players[static_cast<size_t>(p)];
@@ -145,7 +334,7 @@ void GUIView::showBoard(const GameStateView& state) {
             continue;
         }
 
-        const Rectangle tileBounds = gui::tile::boardTileBounds(i, boardBounds, totalTiles);
+        const Rectangle tileBounds = gui::tile::boardTileBounds(i, layout.boardBounds, totalTiles);
         const float cx = tileBounds.x + tileBounds.width * 0.5f;
         const float cy = tileBounds.y + tileBounds.height * 0.5f;
         const float tokenBox = std::min(tileBounds.width, tileBounds.height) * 0.44f;
@@ -196,9 +385,6 @@ void GUIView::showBoard(const GameStateView& state) {
         }
     }
 
-    drawLeftPanel(state, panelW, H);
-    drawRightPanel(state, panelW, H);
-
     if (diceAnimating_) {
         drawDiceAnimation(GetFrameTime());
     }
@@ -216,224 +402,441 @@ void GUIView::showBoard(const GameStateView& state) {
         buyPromptActive_ = false;
     }
 
-    if (currentPrompt_ && currentPrompt_->type != GUIPromptType::NONE && !currentPrompt_->resolved) {
-        renderPromptOverlay(*currentPrompt_);
-    }
 #else
     (void)state;
 #endif
 }
 
-void GUIView::drawLeftPanel(const GameStateView& state, float panelW, float H) {
+#if NIMONSPOLY_ENABLE_RAYLIB
+void GUIView::drawLeftPanel(const GameStateView& state, Rectangle summaryRect, Rectangle inputRect, Rectangle playersRect) {
 #if NIMONSPOLY_ENABLE_RAYLIB
     AssetManager& am = AssetManager::get();
-    const float pad = 14.f;
 
-    gui::draw::drawPanel(Rectangle{0.f, 0.f, panelW, H}, PANEL_BG, PANEL_BORDER);
-    DrawRectangleRec(Rectangle{panelW - 1.f, 0.f, 2.f, H}, PANEL_BORDER);
-
-    float y = pad;
+    gui::draw::drawPanel(summaryRect, SURFACE_BG, PANEL_BORDER);
     {
-        const std::string title = "NIMONSPOLY";
-        const float fontSize = panelW * 0.13f;
-        const Font& font = am.font("extrabold");
-        const Vector2 size = MeasureTextEx(font, title.c_str(), fontSize, 0.f);
-        DrawTextEx(font,
-                   title.c_str(),
-                   Vector2{panelW * 0.5f - size.x * 0.5f, y},
-                   fontSize,
-                   0.f,
-                   ACCENT_CYAN);
-        y += fontSize + 6.f;
+        const float midY = summaryRect.y + summaryRect.height * 0.5f;
+        const std::string roundText = "Ronde " + std::to_string(state.currentTurn) + " / " + std::to_string(state.maxTurn);
+        DrawTextEx(am.font("bold"), roundText.c_str(), Vector2{summaryRect.x + 14.f, midY - 14.f}, 19.f, 0.f, TEXT_PRIMARY);
+        DrawTextEx(am.font("regular"), "putaran", Vector2{summaryRect.x + 14.f, midY + 7.f}, 13.f, 0.f, TEXT_MUTED);
+        const std::string clockStr = currentClockLabel();
+        const Vector2 clockMeasure = MeasureTextEx(am.font("bold"), clockStr.c_str(), 22.f, 0.f);
+        DrawTextEx(am.font("bold"), clockStr.c_str(),
+                   Vector2{summaryRect.x + summaryRect.width - clockMeasure.x - 14.f, midY - 14.f},
+                   22.f, 0.f, ACCENT_CYAN);
+        DrawTextEx(am.font("regular"), "waktu",
+                   Vector2{summaryRect.x + summaryRect.width - clockMeasure.x - 14.f, midY + 7.f},
+                   13.f, 0.f, TEXT_MUTED);
     }
 
+    const bool promptActive =
+        currentPrompt_ &&
+        currentPrompt_->type != GUIPromptType::NONE &&
+        !currentPrompt_->resolved;
+    drawPanelFrame(am, inputRect, "Pop Up", promptActive ? "aktif" : "standby", SURFACE_BG);
     {
-        const std::string roundText =
-            "Round  " + std::to_string(state.currentTurn) + " / " + std::to_string(state.maxTurn);
-        const float fontSize = panelW * 0.07f;
-        const Font& font = am.font("regular");
-        const Vector2 size = MeasureTextEx(font, roundText.c_str(), fontSize, 0.f);
-        DrawTextEx(font,
-                   roundText.c_str(),
-                   Vector2{panelW * 0.5f - size.x * 0.5f, y},
-                   fontSize,
-                   0.f,
-                   TEXT_MUTED);
-        y += fontSize + 18.f;
-    }
-
-    DrawLineEx(Vector2{pad, y}, Vector2{panelW - pad, y}, 1.f, gui::menu::makeColor(255, 255, 255, 25));
-    y += 16.f;
-
-    const float rowH = 42.f;
-    for (int i = 0; i < static_cast<int>(state.players.size()); ++i) {
-        const auto& player = state.players[static_cast<size_t>(i)];
-        const bool active = (player.username == state.currentPlayerName);
-        const bool bankrupt = (player.status == PlayerStatus::BANKRUPT);
-        const RaylibColor playerColor =
-            gui::menu::setupPalette()[static_cast<size_t>(selectedPlayerColor(setup_, player.username, i))];
-
-        if (active) {
-            const Rectangle highlight{pad * 0.25f, y, panelW - pad * 0.5f, rowH};
-            gui::draw::drawPanel(highlight,
-                                 gui::menu::makeColor(playerColor.r, playerColor.g, playerColor.b, 35),
-                                 gui::menu::makeColor(playerColor.r, playerColor.g, playerColor.b, 90));
-        }
-
-        DrawCircleV(Vector2{pad + 10.f, y + rowH * 0.5f},
-                    6.f,
-                    bankrupt ? gui::menu::makeColor(100, 100, 110) : playerColor);
-
-        std::string displayName = player.username;
-        if (displayName.size() > 12) {
-            displayName = displayName.substr(0, 10) + "..";
-        }
-        DrawTextEx(am.font("bold"),
-                   displayName.c_str(),
-                   Vector2{pad + 24.f, y + 4.f},
-                   panelW * 0.065f,
-                   0.f,
-                   bankrupt ? gui::menu::makeColor(100, 105, 115) : (active ? TEXT_PRIMARY : TEXT_MUTED));
-
-        const std::string moneyText = "M" + std::to_string(player.money.getAmount());
-        DrawTextEx(am.font("regular"),
-                   moneyText.c_str(),
-                   Vector2{pad + 24.f, y + rowH * 0.52f},
-                   panelW * 0.055f,
-                   0.f,
-                   bankrupt ? gui::menu::makeColor(100, 105, 115) : TEXT_GREEN);
-
-        if (bankrupt) {
-            DrawTextEx(am.font("bold"),
-                       "BANKRUPT",
-                       Vector2{panelW - pad - 90.f, y + rowH * 0.30f},
-                       panelW * 0.05f,
-                       0.f,
-                       gui::menu::makeColor(0xff, 0x4d, 0x4d));
-        }
-
-        y += rowH + 4.f;
-    }
-
-    y += 10.f;
-    DrawLineEx(Vector2{pad, y}, Vector2{panelW - pad, y}, 1.f, gui::menu::makeColor(255, 255, 255, 25));
-    y += 16.f;
-
-    DrawTextEx(am.font("bold"),
-               "GAME LOG",
-               Vector2{panelW * 0.5f - MeasureTextEx(am.font("bold"), "GAME LOG", panelW * 0.07f, 0.f).x * 0.5f, y},
-               panelW * 0.07f,
-               0.f,
-               TEXT_PRIMARY);
-    y += panelW * 0.07f + 10.f;
-
-    const int total = static_cast<int>(log_.size());
-    const float lineH = 18.f;
-    const float maxLogH = H - y - pad;
-    float usedH = 0.f;
-    struct VisibleLog {
-        int idx;
-        std::vector<std::string> lines;
-    };
-    std::vector<VisibleLog> visible;
-
-    for (int li = total - 1; li >= 0; --li) {
-        const auto& entry = log_[static_cast<size_t>(li)];
-        const std::string full = "[" + entry.username + "] " + entry.detail;
-        auto wrapped = gui::draw::wrapText(am, "regular", full, panelW * 0.055f, panelW - pad * 2.f);
-        const float h = static_cast<float>(wrapped.size()) * lineH;
-        if (usedH + h > maxLogH) {
-            break;
-        }
-        visible.push_back({li, std::move(wrapped)});
-        usedH += h;
-    }
-
-    float drawY = y;
-    for (auto it = visible.rbegin(); it != visible.rend(); ++it) {
-        const RaylibColor color = (it->idx == total - 1) ? TEXT_PRIMARY : TEXT_MUTED;
-        for (const auto& line : it->lines) {
-            DrawTextEx(am.font("regular"), line.c_str(), Vector2{pad, drawY}, panelW * 0.055f, 0.f, color);
-            drawY += lineH;
-        }
-    }
-
-    if (log_.empty()) {
-        DrawTextEx(am.font("regular"),
-                   "No events yet",
-                   Vector2{pad, drawY},
-                   panelW * 0.055f,
-                   0.f,
-                   TEXT_MUTED);
-    }
-#else
-    (void)state;
-    (void)panelW;
-    (void)H;
-#endif
-}
-
-void GUIView::drawRightPanel(const GameStateView& state, float panelW, float H) {
-#if NIMONSPOLY_ENABLE_RAYLIB
-    AssetManager& am = AssetManager::get();
-    const float W = static_cast<float>(GetScreenWidth());
-    const float px = W - panelW;
-    const float pad = 14.f;
-
-    gui::draw::drawPanel(Rectangle{px, 0.f, panelW, H}, PANEL_BG, PANEL_BORDER);
-    DrawRectangleRec(Rectangle{px, 0.f, 2.f, H}, PANEL_BORDER);
-
-    float y = pad;
-    const std::array<const char*, 6> actionLabels{"TEBUS", "BANGUN", "GADAI", "KARTU", "SIMPAN", "SELESAI"};
-    const float btnW = (panelW - pad * 2.f - 8.f) * 0.5f;
-    const float btnH = 40.f;
-    const float gapX = 8.f;
-    const float gapY = 8.f;
-
-    for (int i = 0; i < 6; ++i) {
-        const int col = i % 2;
-        const int row = i / 2;
-        const Rectangle rect{
-            px + pad + col * (btnW + gapX),
-            y + row * (btnH + gapY),
-            btnW,
-            btnH,
+        const Rectangle body = panelBodyRect(inputRect, 56.f, 14.f);
+        const Rectangle inputBox{
+            body.x,
+            body.y + body.height - 52.f,
+            body.width,
+            52.f,
         };
-        gui::draw::drawPanel(rect, BTN_BG, BTN_BORDER);
-        drawTextCentered(am.font("bold"), actionLabels[static_cast<size_t>(i)], btnH * 0.38f, TEXT_PRIMARY, rect);
+        const float contentBottom = inputBox.y - 12.f;
+        float cy = body.y;
+
+        if (!promptActive) {
+            const Rectangle idleCard{body.x, cy, body.width, std::min(112.f, body.height * 0.34f)};
+            gui::draw::drawPanel(idleCard,
+                                 gui::menu::makeColor(0x12, 0x19, 0x25, 245),
+                                 gui::menu::makeColor(0x39, 0x4e, 0x68));
+            DrawTextEx(am.font("bold"),
+                       "Belum ada pop-up aktif.",
+                       Vector2{idleCard.x + 12.f, idleCard.y + 12.f},
+                       18.f,
+                       0.f,
+                       TEXT_PRIMARY);
+            auto idleLines = gui::draw::wrapText(
+                am,
+                "regular",
+                "Saat engine meminta input, prompt akan muncul di panel ini tanpa menutup board.",
+                14.f,
+                idleCard.width - 24.f);
+            float idleY = idleCard.y + 40.f;
+            for (size_t i = 0; i < idleLines.size() && i < 3; ++i) {
+                DrawTextEx(am.font("regular"),
+                           idleLines[i].c_str(),
+                           Vector2{idleCard.x + 12.f, idleY},
+                           14.f,
+                           0.f,
+                           TEXT_MUTED);
+                idleY += 17.f;
+            }
+            cy = idleCard.y + idleCard.height + 16.f;
+
+            const std::string activeText = state.currentPlayerName.empty() ? "Menunggu giliran" : state.currentPlayerName;
+            DrawTextEx(am.font("bold"), "Giliran aktif", Vector2{body.x, cy}, 14.f, 0.f, TEXT_MUTED);
+            cy += 18.f;
+            DrawTextEx(am.font("semibold"), activeText.c_str(), Vector2{body.x, cy}, 18.f, 0.f, TEXT_PRIMARY);
+            cy += 32.f;
+
+            const std::string tip = state.hasRolledDice
+                ? "Bangun, gadai, tebus, gunakan kartu, atau akhiri giliran."
+                : "Lempar dadu untuk memulai aksi utama pada giliran ini.";
+            auto tipLines = gui::draw::wrapText(am, "regular", tip, 14.f, body.width);
+            for (size_t i = 0; i < tipLines.size() && cy < contentBottom - 16.f; ++i) {
+                DrawTextEx(am.font("regular"),
+                           tipLines[i].c_str(),
+                           Vector2{body.x, cy},
+                           14.f,
+                           0.f,
+                           TEXT_MUTED);
+                cy += 17.f;
+            }
+
+            if (lastD1_ > 0 && state.hasRolledDice && cy + 54.f < contentBottom) {
+                cy += 10.f;
+                DrawTextEx(am.font("bold"), "Dadu terakhir", Vector2{body.x, cy}, 14.f, 0.f, TEXT_MUTED);
+                cy += 20.f;
+                constexpr float kDiceSz = 34.f;
+                drawDieFace(body.x + kDiceSz * 0.5f, cy + kDiceSz * 0.5f, kDiceSz, lastD1_, 0xFAFAF8, 0x282832);
+                drawDieFace(body.x + kDiceSz + 12.f + kDiceSz * 0.5f, cy + kDiceSz * 0.5f, kDiceSz, lastD2_, 0xFAFAF8, 0x282832);
+                DrawTextEx(am.font("semibold"),
+                           ("= " + std::to_string(lastD1_ + lastD2_)).c_str(),
+                           Vector2{body.x + kDiceSz * 2.f + 20.f, cy + 4.f},
+                           23.f,
+                           0.f,
+                           ACCENT_GOLD);
+            }
+        } else {
+            const GUIPromptState& prompt = *currentPrompt_;
+
+            if (buyPromptActive_ && prompt.type == GUIPromptType::YES_NO) {
+                const Rectangle card{body.x, cy, body.width, std::min(112.f, contentBottom - body.y)};
+                gui::draw::drawPanel(card,
+                                     gui::menu::makeColor(0xf5, 0xf7, 0xfb, 250),
+                                     gui::menu::makeColor(0x5c, 0x82, 0xb5));
+                DrawTextEx(am.font("bold"),
+                           buyPromptInfo_.code.c_str(),
+                           Vector2{card.x + 12.f, card.y + 10.f},
+                           24.f,
+                           0.f,
+                           gui::menu::makeColor(0x23, 0x3e, 0x64));
+                DrawTextEx(am.font("semibold"),
+                           buyPromptInfo_.name.c_str(),
+                           Vector2{card.x + 12.f, card.y + 40.f},
+                           18.f,
+                           0.f,
+                           gui::menu::makeColor(0x2f, 0x49, 0x6d));
+                DrawTextEx(am.font("regular"),
+                           ("Harga: " + buyPromptInfo_.purchasePrice.toString()).c_str(),
+                           Vector2{card.x + 12.f, card.y + 68.f},
+                           15.f,
+                           0.f,
+                           gui::menu::makeColor(0x15, 0x7a, 0x4a));
+                DrawTextEx(am.font("regular"),
+                           ("Uangmu: " + buyPromptMoney_.toString()).c_str(),
+                           Vector2{card.x + 12.f, card.y + 88.f},
+                           15.f,
+                           0.f,
+                           gui::menu::makeColor(0x6a, 0x75, 0x86));
+                cy = card.y + card.height + 14.f;
+            }
+
+            DrawTextEx(am.font("bold"), "Prompt aktif", Vector2{body.x, cy}, 14.f, 0.f, TEXT_MUTED);
+            cy += 22.f;
+            auto promptLines = gui::draw::wrapText(am, "bold", prompt.label, 18.f, body.width);
+            for (size_t i = 0; i < promptLines.size() && cy < contentBottom - 90.f; ++i) {
+                DrawTextEx(am.font("bold"),
+                           promptLines[i].c_str(),
+                           Vector2{body.x, cy},
+                           18.f,
+                           0.f,
+                           TEXT_PRIMARY);
+                cy += 22.f;
+            }
+            cy += 6.f;
+
+            std::string hint = "Ketik jawaban lalu Enter.";
+            if (prompt.type == GUIPromptType::YES_NO) {
+                hint = "Input: Y atau N";
+            } else if (prompt.type == GUIPromptType::AUCTION) {
+                hint = "Input: PASS atau BID <jumlah>";
+            } else if (prompt.type == GUIPromptType::MENU_CHOICE ||
+                       prompt.type == GUIPromptType::NUMBER ||
+                       prompt.type == GUIPromptType::PLAYER_COUNT ||
+                       prompt.type == GUIPromptType::TAX_CHOICE ||
+                       prompt.type == GUIPromptType::LIQUIDATION ||
+                       prompt.type == GUIPromptType::SKILL_CARD) {
+                hint = "Input: angka sesuai pilihan";
+            } else if (prompt.type == GUIPromptType::DICE_MANUAL) {
+                hint = "Input: dua angka, misal 3 5. Esc untuk batal.";
+            }
+
+            auto hintLines = gui::draw::wrapText(am, "regular", hint, 14.f, body.width);
+            for (size_t i = 0; i < hintLines.size() && cy < contentBottom - 60.f; ++i) {
+                DrawTextEx(am.font("regular"),
+                           hintLines[i].c_str(),
+                           Vector2{body.x, cy},
+                           14.f,
+                           0.f,
+                           TEXT_MUTED);
+                cy += 17.f;
+            }
+
+            if (prompt.type == GUIPromptType::MENU_CHOICE && !prompt.options.empty()) {
+                cy += 6.f;
+                for (int i = 0; i < static_cast<int>(prompt.options.size()) && cy < contentBottom - 20.f; ++i) {
+                    const std::string optionLine =
+                        std::to_string(i) + ". " + prompt.options[static_cast<size_t>(i)];
+                    auto optionLines = gui::draw::wrapText(am, "regular", optionLine, 14.f, body.width - 6.f);
+                    for (const std::string& line : optionLines) {
+                        if (cy >= contentBottom - 18.f) {
+                            break;
+                        }
+                        DrawTextEx(am.font("regular"),
+                                   line.c_str(),
+                                   Vector2{body.x + 6.f, cy},
+                                   14.f,
+                                   0.f,
+                                   TEXT_PRIMARY);
+                        cy += 16.f;
+                    }
+                    cy += 4.f;
+                }
+            }
+        }
+
+        gui::draw::drawPanel(inputBox,
+                             promptActive ? gui::menu::makeColor(0x16, 0x1d, 0x2c, 250)
+                                         : gui::menu::makeColor(0x11, 0x17, 0x23, 240),
+                             promptActive ? gui::menu::makeColor(0x6b, 0x8f, 0xc0)
+                                         : gui::menu::makeColor(0x3f, 0x54, 0x71));
+        const std::string buffer = promptActive
+            ? ("> " + currentPrompt_->textBuffer + "_")
+            : "> menunggu prompt";
+        DrawTextEx(am.font("regular"),
+                   buffer.c_str(),
+                   Vector2{inputBox.x + 12.f, inputBox.y + inputBox.height * 0.5f - 10.f},
+                   18.f,
+                   0.f,
+                   promptActive ? gui::menu::makeColor(220, 230, 246) : TEXT_MUTED);
     }
-    y += 3.f * (btnH + gapY) + 18.f;
 
-    DrawLineEx(Vector2{px + pad, y}, Vector2{px + panelW - pad, y}, 1.f, gui::menu::makeColor(255, 255, 255, 25));
-    y += 18.f;
+    drawPanelFrame(am, playersRect, "Daftar Pemain",
+                   std::to_string(state.players.size()) + " pemain", SURFACE_BG);
+    {
+        const Rectangle body = panelBodyRect(playersRect, 56.f, 14.f);
+        std::vector<int> displayOrder(state.players.size());
+        for (int i = 0; i < static_cast<int>(displayOrder.size()); ++i) {
+            displayOrder[static_cast<size_t>(i)] = i;
+        }
 
-    const bool diceDisabled = state.hasRolledDice;
-    const Rectangle diceRect{px + pad, y, panelW - pad * 2.f, 56.f};
-    gui::draw::drawPanel(diceRect,
-                         diceDisabled ? gui::menu::makeColor(0x12, 0x1a, 0x2e)
-                                      : gui::menu::makeColor(0x1a, 0x28, 0x45),
-                         diceDisabled ? BTN_BORDER : ACCENT_GOLD);
-    drawTextCentered(am.font("title"),
-                     "LEMPAR DADU",
-                     diceRect.height * 0.42f,
-                     diceDisabled ? TEXT_MUTED : TEXT_PRIMARY,
-                     diceRect);
-    y += diceRect.height + 18.f;
+        constexpr float rowGap = 10.f;
+        constexpr float rowH = 62.f;
+        float y = body.y;
+        for (int orderIndex = 0; orderIndex < static_cast<int>(displayOrder.size()); ++orderIndex) {
+            const int playerIndex = displayOrder[static_cast<size_t>(orderIndex)];
+            const auto& player = state.players[static_cast<size_t>(playerIndex)];
+            const bool active = player.username == state.currentPlayerName;
+            const bool bankrupt = player.status == PlayerStatus::BANKRUPT;
+            const RaylibColor playerColor =
+                gui::menu::setupPalette()[static_cast<size_t>(selectedPlayerColor(setup_, player.username, playerIndex))];
 
-    DrawLineEx(Vector2{px + pad, y}, Vector2{px + panelW - pad, y}, 1.f, gui::menu::makeColor(255, 255, 255, 25));
-    y += 18.f;
+            const Rectangle row{body.x, y, body.width, rowH};
+            gui::draw::drawPanel(row,
+                                 active ? gui::menu::makeColor(playerColor.r, playerColor.g, playerColor.b, 26)
+                                        : gui::menu::makeColor(0x10, 0x17, 0x22, 240),
+                                 active ? gui::menu::makeColor(playerColor.r, playerColor.g, playerColor.b, 120)
+                                        : gui::menu::makeColor(0x33, 0x45, 0x5d));
 
-    DrawTextEx(am.font("bold"),
-               "YOUR PROPERTIES",
-               Vector2{
-                   px + panelW * 0.5f - MeasureTextEx(am.font("bold"), "YOUR PROPERTIES", panelW * 0.07f, 0.f).x * 0.5f,
-                   y,
-               },
-               panelW * 0.07f,
-               0.f,
-               TEXT_PRIMARY);
-    y += panelW * 0.07f + 12.f;
+            if (active) {
+                DrawRectangleRec(
+                    Rectangle{row.x, row.y, 5.f, row.height},
+                    gui::menu::makeColor(playerColor.r, playerColor.g, playerColor.b, 220));
+            }
 
+            const Vector2 markerCenter{row.x + 24.f, row.y + row.height * 0.5f};
+            DrawCircleV(markerCenter,
+                        12.f,
+                        bankrupt ? gui::menu::makeColor(115, 120, 128) : playerColor);
+            DrawCircleLinesV(markerCenter,
+                             12.f,
+                             active ? gui::menu::makeColor(255, 255, 255, 220)
+                                    : gui::menu::makeColor(255, 255, 255, 70));
+
+            std::string name = player.username;
+            if (name.size() > 15) {
+                name = name.substr(0, 13) + "..";
+            }
+            DrawTextEx(am.font("bold"), name.c_str(), Vector2{row.x + 46.f, row.y + 10.f}, 17.f, 0.f,
+                       bankrupt ? gui::menu::makeColor(120, 125, 135) : TEXT_PRIMARY);
+
+            const std::string meta = std::to_string(player.propertyCount) + " properti  |  " +
+                                     std::to_string(player.skillCardCount) + " kartu";
+            DrawTextEx(am.font("regular"), meta.c_str(),
+                       Vector2{row.x + 46.f, row.y + 33.f}, 13.f, 0.f,
+                       bankrupt ? gui::menu::makeColor(98, 104, 116) : TEXT_MUTED);
+
+            const std::string moneyLabel = "M" + std::to_string(player.money.getAmount());
+            const Vector2 moneySize = MeasureTextEx(am.font("bold"), moneyLabel.c_str(), 18.f, 0.f);
+            DrawTextEx(am.font("bold"),
+                       moneyLabel.c_str(),
+                       Vector2{row.x + row.width - moneySize.x - 14.f, row.y + 12.f},
+                       18.f,
+                       0.f,
+                       bankrupt ? gui::menu::makeColor(112, 118, 126) : TEXT_GREEN);
+
+            y += rowH + rowGap;
+        }
+    }
+#else
+    (void)state;
+    (void)summaryRect;
+    (void)inputRect;
+    (void)playersRect;
+#endif
+}
+
+void GUIView::drawRightPanel(const GameStateView& state, Rectangle logRect, Rectangle actionsRect) {
+#if NIMONSPOLY_ENABLE_RAYLIB
+    AssetManager& am = AssetManager::get();
+
+    drawPanelFrame(am,
+                   logRect,
+                   "Log",
+                   std::to_string(log_.size()) + " entri",
+                   SURFACE_BG);
+    {
+        const Rectangle body = panelBodyRect(logRect, 56.f, 14.f);
+        const Vector2 mouse = GetMousePosition();
+        if (CheckCollisionPointRec(mouse, logRect)) {
+            const float wheel = GetMouseWheelMove();
+            if (wheel > 0.f) {
+                logScrollOffset_ = std::max(0, logScrollOffset_ - 1);
+            } else if (wheel < 0.f) {
+                logScrollOffset_ += 1;
+            }
+        }
+
+        if (log_.empty()) {
+            DrawTextEx(am.font("regular"),
+                       "Belum ada log yang tercatat.",
+                       Vector2{body.x, body.y + 6.f},
+                       16.f,
+                       0.f,
+                       TEXT_MUTED);
+        } else {
+            logScrollOffset_ = std::clamp(logScrollOffset_, 0, std::max(0, static_cast<int>(log_.size()) - 1));
+            float y = body.y;
+            int drawn = 0;
+            for (int offset = logScrollOffset_; offset < static_cast<int>(log_.size()); ++offset) {
+                const auto& entry = log_[log_.size() - 1 - static_cast<size_t>(offset)];
+                const std::string header = "T" + std::to_string(entry.turn) + "  " + entry.actionType;
+                const std::string detail = entry.username.empty() ? entry.detail : ("[" + entry.username + "] " + entry.detail);
+                auto wrapped = gui::draw::wrapText(am, "regular", detail, 15.f, body.width - 26.f);
+                const float cardH = 32.f + static_cast<float>(wrapped.size()) * 17.f;
+                if (y + cardH > body.y + body.height) {
+                    break;
+                }
+
+                const Rectangle card{body.x, y, body.width - 8.f, cardH};
+                gui::draw::drawPanel(card,
+                                     gui::menu::makeColor(0x11, 0x18, 0x24, 250),
+                                     gui::menu::makeColor(0x33, 0x45, 0x5d));
+                DrawTextEx(am.font("bold"),
+                           header.c_str(),
+                           Vector2{card.x + 10.f, card.y + 8.f},
+                           14.f,
+                           0.f,
+                           drawn == 0 ? TEXT_PRIMARY : TEXT_MUTED);
+
+                float textY = card.y + 24.f;
+                for (const std::string& line : wrapped) {
+                    DrawTextEx(am.font("regular"),
+                               line.c_str(),
+                               Vector2{card.x + 10.f, textY},
+                               15.f,
+                               0.f,
+                               TEXT_PRIMARY);
+                    textY += 16.f;
+                }
+
+                y += cardH + 8.f;
+                ++drawn;
+            }
+        }
+    }
+
+    gui::draw::drawPanel(actionsRect, SURFACE_BG, PANEL_BORDER);
+    {
+        const ActionLayout actionLayout = makeActionLayout(actionsRect);
+        const bool diceDisabled = state.hasRolledDice;
+        gui::draw::drawPanel(actionLayout.diceRect,
+                             diceDisabled ? gui::menu::makeColor(0x17, 0x1c, 0x27)
+                                          : gui::menu::makeColor(0x26, 0x31, 0x47),
+                             diceDisabled ? gui::menu::makeColor(0x4b, 0x57, 0x67)
+                                          : ACCENT_GOLD);
+        drawTextCentered(am.font("title"),
+                         "LEMPAR DADU",
+                         26.f,
+                         diceDisabled ? TEXT_MUTED : TEXT_PRIMARY,
+                         Rectangle{
+                             actionLayout.diceRect.x,
+                             actionLayout.diceRect.y + 4.f,
+                             actionLayout.diceRect.width,
+                             actionLayout.diceRect.height * 0.56f,
+                         });
+        drawTextCentered(am.font("regular"),
+                         diceDisabled ? "Sudah dilempar" : "Aksi utama giliran ini",
+                         14.f,
+                         diceDisabled ? TEXT_MUTED : gui::menu::makeColor(0xff, 0xe7, 0x9c),
+                         Rectangle{
+                             actionLayout.diceRect.x,
+                             actionLayout.diceRect.y + actionLayout.diceRect.height * 0.60f,
+                             actionLayout.diceRect.width,
+                             actionLayout.diceRect.height * 0.30f,
+                         });
+
+        const bool setDiceDisabled = state.hasRolledDice;
+        gui::draw::drawPanel(actionLayout.setDiceRect,
+                             setDiceDisabled ? gui::menu::makeColor(0x11, 0x16, 0x22)
+                                             : gui::menu::makeColor(0x16, 0x22, 0x34),
+                             setDiceDisabled ? gui::menu::makeColor(0x37, 0x43, 0x54)
+                                             : gui::menu::makeColor(0x76, 0x9a, 0xd9));
+        drawTextCentered(am.font("bold"),
+                         "ATUR DADU",
+                         16.f,
+                         setDiceDisabled ? TEXT_MUTED : gui::menu::makeColor(0xdf, 0xe8, 0xff),
+                         actionLayout.setDiceRect);
+
+        for (size_t i = 0; i < ACTION_LABELS.size(); ++i) {
+            const Rectangle rect = actionLayout.buttons[i];
+            gui::draw::drawPanel(rect, BTN_BG, BTN_BORDER);
+            drawTextCentered(am.font("bold"), ACTION_LABELS[i], 14.f, TEXT_PRIMARY, rect);
+        }
+
+        DrawTextEx(am.font("regular"),
+                   "Bangun, gadai, tebus, simpan, atau buka kartu dari panel ini.",
+                   Vector2{actionsRect.x + 14.f, actionLayout.tipY},
+                   13.f, 0.f, TEXT_MUTED);
+    }
+#else
+    (void)state;
+    (void)logRect;
+    (void)actionsRect;
+#endif
+}
+
+void GUIView::drawPropertyPanel(const GameStateView& state, Rectangle rect) {
+#if NIMONSPOLY_ENABLE_RAYLIB
+    AssetManager& am = AssetManager::get();
+    drawPanelFrame(am,
+                   rect,
+                   "Properti Milikku",
+                   state.currentPlayerName.empty() ? "Tidak ada pemilik aktif" : state.currentPlayerName,
+                   SURFACE_BG);
+
+    const Rectangle body = panelBodyRect(rect, 56.f, 14.f);
     std::vector<const PropertyView*> myProperties;
     for (const auto& property : state.properties) {
         if (property.ownerName == state.currentPlayerName) {
@@ -443,60 +846,68 @@ void GUIView::drawRightPanel(const GameStateView& state, float panelW, float H) 
 
     if (myProperties.empty()) {
         DrawTextEx(am.font("regular"),
-                   "No properties owned",
-                   Vector2{px + pad, y},
-                   panelW * 0.06f,
+                   "Belum ada properti yang dimiliki pemain aktif.",
+                   Vector2{body.x, body.y + 10.f},
+                   16.f,
                    0.f,
                    TEXT_MUTED);
         return;
     }
 
-    const float cardW = (panelW - pad * 2.f - 8.f) / 3.f;
-    const float cardH = cardW * 1.35f;
-    const float cardGap = 4.f;
+    const float cardH = std::min(138.f, body.height - 6.f);
+    const float cardW = std::clamp(cardH * 0.76f, 108.f, 132.f);
+    const float gap = 12.f;
+    const int maxVisible = std::max(1, static_cast<int>((body.width + gap) / (cardW + gap)));
+    const int visibleCount = std::min<int>(maxVisible, static_cast<int>(myProperties.size()));
 
-    for (size_t idx = 0; idx < myProperties.size() && idx < 6; ++idx) {
-        const auto* property = myProperties[idx];
-        const int col = static_cast<int>(idx % 3);
-        const int row = static_cast<int>(idx / 3);
-        const Rectangle card{
-            px + pad + col * (cardW + cardGap),
-            y + row * (cardH + cardGap),
-            cardW,
-            cardH,
-        };
-        gui::draw::drawPanel(card, gui::menu::makeColor(0x0d, 0x14, 0x24), BTN_BORDER);
+    float x = body.x;
+    for (int idx = 0; idx < visibleCount; ++idx) {
+        const auto* property = myProperties[static_cast<size_t>(idx)];
+        const Rectangle card{x, body.y, cardW, cardH};
+        gui::draw::drawPanel(card, SURFACE_ALT, gui::menu::makeColor(0x40, 0x55, 0x73));
 
         ::Color group = ::Color::DEFAULT;
+        std::string tileName = property->name;
         for (const auto& tile : state.tiles) {
             if (tile.code == property->code) {
                 group = tile.color;
+                tileName = tile.name;
                 break;
             }
         }
 
         const RaylibColor stripColor = gui::draw::tileColor(group);
         if (group != ::Color::DEFAULT) {
-            DrawRectangleRec(Rectangle{card.x, card.y, card.width, card.height * 0.22f}, stripColor);
+            DrawRectangleRec(Rectangle{card.x, card.y, card.width, 16.f}, stripColor);
         }
 
-        RaylibColor codeColor = (group != ::Color::DEFAULT) ? stripColor : TEXT_MUTED;
-        if (group == ::Color::YELLOW) {
-            codeColor = gui::menu::makeColor(0x90, 0x87, 0x00);
-        }
-        drawTextCentered(am.font("bold"),
-                         property->code,
-                         card.height * 0.22f,
-                         codeColor,
-                         Rectangle{card.x, card.y + card.height * 0.38f, card.width, card.height * 0.40f});
+        DrawTextEx(am.font("bold"),
+                   property->code.c_str(),
+                   Vector2{card.x + 10.f, card.y + 26.f},
+                   26.f,
+                   0.f,
+                   group == ::Color::YELLOW ? gui::menu::makeColor(0x90, 0x87, 0x00)
+                                            : (group != ::Color::DEFAULT ? stripColor : TEXT_PRIMARY));
 
-        if (property->buildingLevel > 0) {
-            const float dotR = 3.5f;
-            const float dotY = card.y + card.height * 0.82f;
-            const int level = std::min(property->buildingLevel, 5);
-            const float startDX = card.x + card.width * 0.5f - (level - 1) * dotR * 1.6f;
+        auto nameLines = gui::draw::wrapText(am, "regular", tileName, 14.f, card.width - 20.f);
+        float nameY = card.y + 58.f;
+        for (size_t lineIdx = 0; lineIdx < nameLines.size() && lineIdx < 2; ++lineIdx) {
+            DrawTextEx(am.font("regular"),
+                       nameLines[lineIdx].c_str(),
+                       Vector2{card.x + 10.f, nameY},
+                       14.f,
+                       0.f,
+                       TEXT_PRIMARY);
+            nameY += 14.f;
+        }
+
+        const int level = std::min(property->buildingLevel, 5);
+        if (level > 0) {
+            const float dotY = card.y + card.height - 18.f;
+            const float dotR = 3.6f;
+            const float startX = card.x + card.width * 0.5f - (level - 1) * dotR * 1.7f;
             for (int d = 0; d < level; ++d) {
-                DrawCircleV(Vector2{startDX + d * dotR * 3.2f, dotY},
+                DrawCircleV(Vector2{startX + d * dotR * 3.4f, dotY},
                             dotR,
                             property->status == PropertyStatus::MORTGAGED
                                 ? gui::menu::makeColor(150, 150, 150)
@@ -505,20 +916,34 @@ void GUIView::drawRightPanel(const GameStateView& state, float panelW, float H) 
         }
 
         if (property->status == PropertyStatus::MORTGAGED) {
-            DrawRectangleRec(card, gui::menu::makeColor(0, 0, 0, 120));
-            drawTextCentered(am.font("bold"),
-                             "MRTG",
-                             card.height * 0.16f,
-                             gui::menu::makeColor(0xff, 0x4d, 0x4d),
-                             card);
+            const Rectangle mortRect{card.x + card.width - 56.f, card.y + 24.f, 44.f, 20.f};
+            gui::draw::drawPanel(mortRect,
+                                 gui::menu::makeColor(0xff, 0x4d, 0x4d, 28),
+                                 gui::menu::makeColor(0xff, 0x4d, 0x4d, 110));
+            drawTextCentered(am.font("bold"), "MRTG", 12.f, gui::menu::makeColor(0xff, 0xc4, 0xc4), mortRect);
         }
+
+        x += cardW + gap;
+    }
+
+    const int hiddenCount = static_cast<int>(myProperties.size()) - visibleCount;
+    if (hiddenCount > 0) {
+        const Rectangle moreRect{x, body.y + cardH * 0.5f - 22.f, 92.f, 44.f};
+        gui::draw::drawPanel(moreRect,
+                             gui::menu::makeColor(255, 255, 255, 12),
+                             gui::menu::makeColor(255, 255, 255, 30));
+        drawTextCentered(am.font("bold"),
+                         "+" + std::to_string(hiddenCount) + " lagi",
+                         16.f,
+                         TEXT_PRIMARY,
+                         moreRect);
     }
 #else
     (void)state;
-    (void)panelW;
-    (void)H;
+    (void)rect;
 #endif
 }
+#endif
 
 void GUIView::drawDieFace(float cx, float cy, float size, int face, unsigned fillRGB, unsigned dotRGB) {
 #if NIMONSPOLY_ENABLE_RAYLIB
@@ -611,7 +1036,10 @@ void GUIView::drawDiceAnimation(float dt) {
 
     static std::mt19937 rng(static_cast<unsigned>(std::random_device{}()));
     std::uniform_int_distribution<int> dist(1, 6);
-    if (static_cast<int>(diceAnimElapsed_ * 10.f) % 2 == 0) {
+    if (queuedManualDice_) {
+        diceAnimFace1_ = queuedDice1_;
+        diceAnimFace2_ = queuedDice2_;
+    } else if (static_cast<int>(diceAnimElapsed_ * 10.f) % 2 == 0) {
         diceAnimFace1_ = dist(rng);
         diceAnimFace2_ = dist(rng);
     }
@@ -722,36 +1150,24 @@ void GUIView::handleInGameClick(float mx, float my, std::string& outCommand, con
 #if NIMONSPOLY_ENABLE_RAYLIB
     const float W = static_cast<float>(GetScreenWidth());
     const float H = static_cast<float>(GetScreenHeight());
-    const float globeSize = H;
-    const float panelW = (W - globeSize) * 0.5f;
-    const float px = W - panelW;
-    const float pad = 14.f;
+    const InGameLayout layout = makeInGameLayout(W, H);
+    const ActionLayout actionLayout = makeActionLayout(layout.actionsPanel);
 
-    float y = pad;
-    const float btnW = (panelW - pad * 2.f - 8.f) * 0.5f;
-    const float btnH = 40.f;
-    const float gapX = 8.f;
-    const float gapY = 8.f;
-    const std::array<const char*, 6> actions{"TEBUS", "BANGUN", "GADAI", "KARTU", "SIMPAN", "SELESAI"};
-
-    for (int i = 0; i < 6; ++i) {
-        const int col = i % 2;
-        const int row = i / 2;
-        const Rectangle rect{
-            px + pad + col * (btnW + gapX),
-            y + row * (btnH + gapY),
-            btnW,
-            btnH,
-        };
-        if (CheckCollisionPointRec(Vector2{mx, my}, rect)) {
-            outCommand = actions[static_cast<size_t>(i)];
+    for (size_t i = 0; i < ACTION_LABELS.size(); ++i) {
+        if (CheckCollisionPointRec(Vector2{mx, my}, actionLayout.buttons[i])) {
+            outCommand = ACTION_LABELS[i];
             return;
         }
     }
-    y += 3.f * (btnH + gapY) + 18.f + 18.f;
 
-    const Rectangle diceRect{px + pad, y, panelW - pad * 2.f, 56.f};
-    if (CheckCollisionPointRec(Vector2{mx, my}, diceRect)) {
+    if (CheckCollisionPointRec(Vector2{mx, my}, actionLayout.setDiceRect)) {
+        if (!state.hasRolledDice && !diceAnimating_) {
+            outCommand = "ATUR_DADU";
+        }
+        return;
+    }
+
+    if (CheckCollisionPointRec(Vector2{mx, my}, actionLayout.diceRect)) {
         if (!state.hasRolledDice && !diceAnimating_) {
             diceAnimating_ = true;
             diceAnimElapsed_ = 0.f;

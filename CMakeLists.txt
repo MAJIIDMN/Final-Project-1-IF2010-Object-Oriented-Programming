@@ -37,13 +37,10 @@ else()
   target_compile_options(game PRIVATE -Wall -Wextra)
 endif()
 
-option(NIMONSPOLY_ENABLE_RAYLIB "Enable Raylib-based GUI" OFF)
-if(NIMONSPOLY_ENABLE_RAYLIB)
-  find_package(PkgConfig REQUIRED)
-  pkg_check_modules(RAYLIB REQUIRED IMPORTED_TARGET raylib)
-  target_link_libraries(game PRIVATE PkgConfig::RAYLIB)
-  target_compile_definitions(game PRIVATE NIMONSPOLY_ENABLE_RAYLIB=1)
-endif()
+find_package(PkgConfig REQUIRED)
+pkg_check_modules(RAYLIB REQUIRED IMPORTED_TARGET raylib)
+target_link_libraries(game PRIVATE PkgConfig::RAYLIB)
+target_compile_definitions(game PRIVATE NIMONSPOLY_ENABLE_RAYLIB=1)
 
 add_custom_target(run
   COMMAND $<TARGET_FILE:game>

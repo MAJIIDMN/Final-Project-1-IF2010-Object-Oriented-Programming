@@ -46,7 +46,7 @@ Athilla Zaidan Zidna Fann<br>
 
 - CMake (>= 3.16 recommended).
 - A C++17 compiler (`clang++`, `g++`, or MSVC).
-- SFML 3.x (only if building the GUI target; see build flags below).
+- Raylib.
 
 ## Instructions
 
@@ -54,9 +54,8 @@ Athilla Zaidan Zidna Fann<br>
 
 Make sure you have a C++17 compiler and CMake installed.
 
-If you want to build the GUI, install SFML 3.x:
-- macOS (Homebrew): `brew install sfml`
-- If your OS package repo only provides SFML 2.x, install SFML 3.x via a source build or a C++ package manager that can provide SFML 3.
+Install Raylib:
+- macOS (Homebrew): `brew install raylib`
 
 ### Configure & Build
 
@@ -87,11 +86,4 @@ Delete the build output directories:
 - `build/`
 - `bin/`
 
-### Build with SFML GUI
-
-Requires SFML 3.x installed and discoverable by CMake.
-
-```bash
-cmake -S . -B build -DNIMONSPOLY_ENABLE_SFML=ON
-cmake --build build
-```
+GUI is always enabled. There is no CLI runtime mode.

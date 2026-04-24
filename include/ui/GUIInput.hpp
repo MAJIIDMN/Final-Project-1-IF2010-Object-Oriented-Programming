@@ -35,6 +35,7 @@ struct GUIPromptState {
     string         textBuffer;
 
     bool           resolved{false};
+    bool           cancelled{false};
     bool           resBool{false};
     int            resInt{0};
     string         resString;

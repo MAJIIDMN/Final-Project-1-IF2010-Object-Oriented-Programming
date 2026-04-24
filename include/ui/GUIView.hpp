@@ -3,6 +3,9 @@
 #include "ui/AppScreen.hpp"
 #include "ui/GUIInput.hpp"
 #include "ui/IGameView.hpp"
+#if NIMONSPOLY_ENABLE_RAYLIB
+#include "ui/RaylibCompat.hpp"
+#endif
 #include "utils/Types.hpp"
 
 class GUIView final : public IGameView {
@@ -72,6 +75,12 @@ public:
     void renderPromptOverlay(const struct GUIPromptState& prompt);
     void setCurrentPrompt(const GUIPromptState* p) { currentPrompt_ = p; }
     bool isDiceAnimating() const { return diceAnimating_; }
+    void setQueuedManualDice(int d1, int d2) {
+        queuedManualDice_ = d1 > 0 && d2 > 0;
+        queuedDice1_ = d1;
+        queuedDice2_ = d2;
+    }
+    void clearQueuedManualDice() { queuedManualDice_ = false; }
 
 private:
     AppScreen  screen_{AppScreen::LANDING};
@@ -89,6 +98,9 @@ private:
     float diceAnimElapsed_{0.f};
     int diceAnimFace1_{1};
     int diceAnimFace2_{1};
+    bool queuedManualDice_{false};
+    int queuedDice1_{1};
+    int queuedDice2_{1};
     static constexpr float DICE_ANIM_DURATION = 1.2f;
 
     PropertyInfo buyPromptInfo_;
@@ -104,8 +116,11 @@ private:
     bool handleMapCustomizeInput();
     bool handleLoadGameInput();
 
-    void drawLeftPanel (const GameStateView& state, float panelW, float H);
-    void drawRightPanel(const GameStateView& state, float panelW, float H);
+#if NIMONSPOLY_ENABLE_RAYLIB
+    void drawLeftPanel (const GameStateView& state, Rectangle summaryRect, Rectangle inputRect, Rectangle playersRect);
+    void drawRightPanel(const GameStateView& state, Rectangle logRect, Rectangle actionsRect);
+    void drawPropertyPanel(const GameStateView& state, Rectangle rect);
+#endif
     void drawGameOver();
     void drawDiceAnimation(float dt);
     void drawDieFace(float cx, float cy, float size, int face,
