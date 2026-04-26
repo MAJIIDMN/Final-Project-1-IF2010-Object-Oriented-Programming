@@ -101,7 +101,9 @@ BuildMenuState Board::getBuildMenuState(const Player& player) const {
 		if (street->getBuildingLevel() >= 5) continue;
 
 		ColorGroup* group = getColorGroup(street->getColor());
-		if (!group || !group->satisfiesEvenBuildRule(*street)) continue;
+		if (!group) continue;
+		bool satisfies = group->satisfiesEvenBuildRule(*street);
+		if (!satisfies) continue;
 
 		TileBuildOption option;
 		option.code = street->getCode();
