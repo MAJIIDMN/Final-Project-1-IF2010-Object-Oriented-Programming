@@ -1,5 +1,9 @@
 #include "tile/header/RailroadTile.hpp"
+
 #include "models/Player.hpp"
+#include "models/board/header/Board.hpp"
+#include "utils/Types.hpp"
+#include "core/log/header/TransactionLogger.hpp"
 
 RailroadTile::RailroadTile(int id, const std::string& code, const std::string& name,
 							   Money price, Money mortgageValue, const std::vector<int>& rentValues)
@@ -24,4 +28,17 @@ Money RailroadTile::getRent(int /*diceRoll*/) const {
 		}
 	}
 	return Money(rent);
+}
+
+void RailroadTile::onLand(Player& player, GameContext& ctx, int diceTotal) {
+	if (!getOwner()) {
+		setOwner(&player);
+		setStatus(PropertyStatus::OWNED);
+		player.addProperty(this);
+		ctx.board.updateMonopolies();
+		ctx.logger.log(ctx.currentTurn, player.getUsername(), "RAILROAD",
+			getLabel() + " kini dimiliki otomatis");
+		return;
+	}
+	PropertyTile::onLand(player, ctx, diceTotal);
 }

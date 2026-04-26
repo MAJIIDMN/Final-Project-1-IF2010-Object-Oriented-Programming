@@ -1,5 +1,9 @@
 #include "tile/header/UtilityTile.hpp"
+
 #include "models/Player.hpp"
+#include "models/board/header/Board.hpp"
+#include "utils/Types.hpp"
+#include "core/log/header/TransactionLogger.hpp"
 
 UtilityTile::UtilityTile(int id, const std::string& code, const std::string& name,
 						 Money price, Money mortgageValue, const std::vector<int>& multipliers)
@@ -25,4 +29,17 @@ Money UtilityTile::getRent(int diceRoll) const {
 		}
 	}
 	return Money(diceRoll * factor);
+}
+
+void UtilityTile::onLand(Player& player, GameContext& ctx, int diceTotal) {
+	if (!getOwner()) {
+		setOwner(&player);
+		setStatus(PropertyStatus::OWNED);
+		player.addProperty(this);
+		ctx.board.updateMonopolies();
+		ctx.logger.log(ctx.currentTurn, player.getUsername(), "UTILITY",
+			getLabel() + " kini dimiliki otomatis");
+		return;
+	}
+	PropertyTile::onLand(player, ctx, diceTotal);
 }

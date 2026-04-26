@@ -13,6 +13,7 @@ public:
 
 	int getFlatAmount() const;
 	int getPercentage() const;
+	void onLand(Player& player, GameContext& ctx, int diceTotal = 0) override;
 
 private:
 	int flatAmount;
