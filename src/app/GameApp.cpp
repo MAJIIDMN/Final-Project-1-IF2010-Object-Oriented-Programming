@@ -46,6 +46,7 @@ int GameApp::run() {
     std::vector<std::unique_ptr<PlayerController>> ownedControllers;
     std::vector<Player*> players;
     std::string pendingCommand;
+    bool mouseClickHandled = false;
 
     auto renderFrame = [&]() {
         BeginDrawing();
@@ -182,9 +183,13 @@ int GameApp::run() {
             if (input.currentPrompt().type != GUIPromptType::NONE &&
                 !input.currentPrompt().resolved) {
                 input.updatePrompt();
-            } else if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT) && pendingCommand.empty()) {
+            } else if (!mouseClickHandled && IsMouseButtonPressed(MOUSE_BUTTON_LEFT) && pendingCommand.empty()) {
                 const Vector2 mouse = GetMousePosition();
                 view.handleInGameClick(mouse.x, mouse.y, pendingCommand, state);
+                mouseClickHandled = true;
+            }
+            if (!IsMouseButtonDown(MOUSE_BUTTON_LEFT)) {
+                mouseClickHandled = false;
             }
         }
 
