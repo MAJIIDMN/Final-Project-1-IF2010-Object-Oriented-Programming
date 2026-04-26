@@ -87,6 +87,8 @@ public:
     bool operator<(const Player& other) const;
     bool operator>(const Player& other) const;
 
+    static int countActiveOthers(const std::vector<Player*>& players, const Player& current);
+
 private:
     std::string username;
     Money money;

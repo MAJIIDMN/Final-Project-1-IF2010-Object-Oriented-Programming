@@ -17,6 +17,8 @@ public:
 	bool isMonopolized() const;
 	bool hasUniformBuildLevel() const;
 	int getMinBuildLevel() const;
+	bool satisfiesEvenBuildRule(const StreetTile& street) const;
+	void demolishAllBuildings();
 
 private:
 	Color color;

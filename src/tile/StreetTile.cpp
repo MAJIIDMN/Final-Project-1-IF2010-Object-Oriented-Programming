@@ -78,3 +78,12 @@ bool StreetTile::isMonopolyComplete() const {
 void StreetTile::setMonopolyComplete(bool value) {
 	monopolyComplete = value;
 }
+
+int StreetTile::getBuildingSaleRefund() const {
+	const int houses = std::min(buildingLevel, 4);
+	int refund = houses * getHouseCost().getAmount() / 2;
+	if (hasHotel()) {
+		refund += getHotelCost().getAmount() / 2;
+	}
+	return refund;
+}

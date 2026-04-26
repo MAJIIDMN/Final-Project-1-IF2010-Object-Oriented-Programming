@@ -306,3 +306,13 @@ bool Player::operator<(const Player& other) const {
 bool Player::operator>(const Player& other) const {
     return money > other.money;
 }
+
+int Player::countActiveOthers(const std::vector<Player*>& players, const Player& current) {
+    int count = 0;
+    for (const Player* player : players) {
+        if (player && player != &current && !player->isBankrupt()) {
+            ++count;
+        }
+    }
+    return count;
+}

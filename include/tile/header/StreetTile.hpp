@@ -26,6 +26,7 @@ public:
 	Money getRent(int diceRoll = 0) const override;
 	bool canBeDeveloped() const override;
 	const std::vector<int>& getRentLevels() const;
+	int getBuildingSaleRefund() const;
 
 	bool isMonopolyComplete() const;
 	void setMonopolyComplete(bool value);
