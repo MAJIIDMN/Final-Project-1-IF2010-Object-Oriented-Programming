@@ -27,7 +27,7 @@ public:
         const string& playerName, int currentBid, int playerMoney) = 0;
 
     virtual TaxChoice getTaxChoice() = 0;
-    virtual int       getLiquidationChoice(int numOptions) = 0;
+    virtual int       getLiquidationChoice(const LiquidationState& liquidationState) = 0;
     virtual int       getSkillCardChoice(const vector<CardInfo>& cards) = 0;
     virtual string    getPropertyCodeInput(const string& prompt) = 0;
 };
