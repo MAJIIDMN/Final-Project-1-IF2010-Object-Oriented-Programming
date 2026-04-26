@@ -121,6 +121,12 @@ Output:
 ./bin/game
 ```
 
+### Using Makefile to Run & Build
+```bash
+make build
+make run
+```
+
 (Alternative)
 
 ```bash
