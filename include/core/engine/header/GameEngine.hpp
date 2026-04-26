@@ -19,6 +19,7 @@
 #include "models/board/header/Dice.hpp"
 #include "models/cards/CardSystem.hpp"
 #include "models/Money.hpp"
+#include "ui/UiDtos.hpp"
 
 class Player;
 class PropertyTile;
@@ -50,11 +51,16 @@ public:
 	EventBus& getEventBus();
 	TransactionLogger& getTransactionLogger();
 	Bank& getBank();
+	FestivalManager& getFestivalManager();
 	Board& getBoard();
 	Dice& getDice();
 	GameConfig& getConfig();
 	CardSystem& getCardSystem();
+	void ensureTurnPrepared(Player& player);
 	bool processCommand(const std::string& input, Player& player);
+	bool isGameOver() const;
+	std::string getGameOverReason() const;
+	WinnerInfo getWinnerInfo(const std::string& winCondition) const;
 
 	void setRepository(IGameRepository* r);
 	bool saveGame(const std::string& id);
