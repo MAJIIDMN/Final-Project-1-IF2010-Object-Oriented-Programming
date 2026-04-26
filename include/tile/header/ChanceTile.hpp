@@ -7,6 +7,7 @@
 class ChanceTile : public ActionTile {
 public:
 	ChanceTile(int id, const std::string& code, const std::string& name);
+	void onLand(Player& player, GameContext& ctx, int diceTotal = 0) override;
 };
 
 #endif

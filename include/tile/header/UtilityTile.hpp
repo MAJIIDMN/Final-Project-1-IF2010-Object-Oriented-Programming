@@ -12,6 +12,7 @@ public:
 					Money price, Money mortgageValue, const std::vector<int>& multiplierTable);
 
 	Money getRent(int diceRoll) const override;
+	void onLand(Player& player, GameContext& ctx, int diceTotal = 0) override;
 
 private:
 	std::vector<int> multiplierTable;

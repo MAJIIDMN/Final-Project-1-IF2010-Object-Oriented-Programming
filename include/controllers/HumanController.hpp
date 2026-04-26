@@ -3,9 +3,11 @@
 #include "controllers/PlayerController.hpp"
 #include "ui/IGameInput.hpp"
 
+class IGameView;
+
 class HumanController final : public PlayerController {
 public:
-    explicit HumanController(IGameInput* input, const string& playerName = "");
+    explicit HumanController(IGameInput* input, IGameView* view = nullptr, const string& playerName = "");
 
     string chooseCommand(const GameStateView& state) override;
 
@@ -21,11 +23,13 @@ public:
     int decideDropCard(const vector<CardInfo>& cards) override;
 
     bool decideJailPay() override;
+    bool confirmAction(const std::string& prompt) override;
     string decideTeleportTarget() override;
     string decideLassoTarget(const vector<string>& players) override;
     string decideDemolitionTarget(const vector<PropertyInfo>& properties) override;
 
 private:
     IGameInput* input;
+    IGameView* view_;
     string playerName_;
 };

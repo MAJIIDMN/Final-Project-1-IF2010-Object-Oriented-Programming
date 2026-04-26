@@ -13,8 +13,9 @@ public:
 	const std::string& getCode() const;
 	const std::string& getName() const;
 	TileType getType() const;
+	virtual std::string getLabel() const;
 
-	virtual void onLand(class Player& player, class GameContext& ctx);
+	virtual void onLand(class Player& player, class GameContext& ctx, int diceTotal = 0);
 
 private:
 	int id;

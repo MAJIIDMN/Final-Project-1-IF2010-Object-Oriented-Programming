@@ -1,7 +1,9 @@
 #include "controllers/HumanController.hpp"
 
-HumanController::HumanController(IGameInput* input, const string& playerName)
-    : input(input), playerName_(playerName) {}
+#include "ui/IGameView.hpp"
+
+HumanController::HumanController(IGameInput* input, IGameView* view, const string& playerName)
+    : input(input), view_(view), playerName_(playerName) {}
 
 string HumanController::chooseCommand(const GameStateView& state) {
     (void)state;
@@ -9,8 +11,9 @@ string HumanController::chooseCommand(const GameStateView& state) {
 }
 
 bool HumanController::decideBuyProperty(const PropertyInfo& info, Money money) {
-    (void)info;
-    (void)money;
+    if (view_) {
+        view_->showBuyPrompt(info, money);
+    }
     return input->getYesNo("Apakah kamu ingin membeli properti ini? (y/n)");
 }
 
@@ -29,8 +32,18 @@ int HumanController::decideSkillCard(const vector<CardInfo>& cards) {
 }
 
 string HumanController::decideFestivalProperty(const vector<PropertyInfo>& props) {
-    (void)props;
-    return input->getPropertyCodeInput("Masukkan kode properti");
+    if (props.empty()) {
+        return "";
+    }
+    vector<string> options;
+    for (const auto& prop : props) {
+        options.push_back(prop.code + " - " + prop.name);
+    }
+    int choice = input->getMenuChoice(options);
+    if (choice > 0 && choice <= static_cast<int>(props.size())) {
+        return props[static_cast<size_t>(choice - 1)].code;
+    }
+    return "";
 }
 
 int HumanController::decideBuild(const BuildMenuState& state) {
@@ -42,15 +55,22 @@ int HumanController::decideBuild(const BuildMenuState& state) {
 }
 
 int HumanController::decideLiquidation(const LiquidationState& state) {
-    return input->getLiquidationChoice(static_cast<int>(state.options.size()));
+    return input->getLiquidationChoice(state);
 }
 
 int HumanController::decideDropCard(const vector<CardInfo>& cards) {
+    if (view_) {
+        view_->showDropCardPrompt(cards);
+    }
     return input->getSkillCardChoice(cards);
 }
 
 bool HumanController::decideJailPay() {
     return input->getYesNo("Bayar denda penjara? (y/n)");
+}
+
+bool HumanController::confirmAction(const std::string& prompt) {
+    return input->getYesNo(prompt);
 }
 
 string HumanController::decideTeleportTarget() {

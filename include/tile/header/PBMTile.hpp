@@ -12,6 +12,7 @@ public:
 	Money calculateTax(const Player& player) const override;
 
 	int getFlatAmount() const;
+	void onLand(Player& player, GameContext& ctx, int diceTotal = 0) override;
 
 private:
 	int flatAmount;

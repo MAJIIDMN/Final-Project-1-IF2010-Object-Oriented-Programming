@@ -19,6 +19,10 @@ TileType Tile::getType() const {
 	return type;
 }
 
-void Tile::onLand(Player& /*player*/, GameContext& /*ctx*/) {
+std::string Tile::getLabel() const {
+	return name + " (" + code + ")";
+}
+
+void Tile::onLand(Player& /*player*/, GameContext& /*ctx*/, int /*diceTotal*/) {
 	// Base tile does nothing on land
 }

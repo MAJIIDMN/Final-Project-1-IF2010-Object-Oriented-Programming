@@ -76,11 +76,6 @@ private:
 	void movePlayer(Player& player, int steps, bool awardGoSalary);
 	void sendToJail(Player& player);
 	void resolveLanding(Player& player, int diceTotal);
-	void resolveCardLanding(Player& player, bool chance);
-	void resolvePropertyLanding(Player& player, PropertyTile& property, int diceTotal);
-	void resolveTaxLanding(Player& player, bool pph);
-	void resolveFestivalLanding(Player& player);
-	void useSkillCard(Player& player, int cardIndex);
 	void mortgageProperty(Player& player, const std::string& code);
 	void redeemProperty(Player& player, const std::string& code);
 	void buildOnProperty(Player& player, const std::string& code);
@@ -89,13 +84,11 @@ private:
 	void printAkta(const std::string& code) const;
 	void printLog(int lastN) const;
 	void awardGoSalary(Player& player);
-	bool auctionProperty(PropertyTile& property, Player& trigger);
 	bool handleAuctionCommand(const std::string& input, Player& player);
 	void checkBankruptcy(Player& player);
 	std::string normalizeCommandToken(const std::string& input) const;
 	void handleJailTurn(Player& player);
 	void payJailFine(Player& player);
-	void executeBankruptcy(Player& debtor, Player* creditor, Money obligation);
 	void syncTurnManagerAfterLoad();
 
 	GameState gameState;

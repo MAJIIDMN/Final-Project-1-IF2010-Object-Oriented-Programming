@@ -6,6 +6,8 @@
 #include "utils/Enums.hpp"
 
 class Player;
+class Board;
+class PropertyInfo;
 
 class PropertyTile : public Tile {
 public:
@@ -27,6 +29,12 @@ public:
 	virtual Money getRent(int diceRoll = 0) const = 0;
 	virtual bool canBeDeveloped() const;
 	virtual int getBuildingLevel() const;
+
+	void onLand(Player& player, GameContext& ctx, int diceTotal = 0) override;
+	std::string getLabel() const override;
+	PropertyInfo toInfo() const;
+	Money getSaleValue() const;
+	bool canMortgageNow(const Board& board) const;
 
 private:
 	Money price;

@@ -87,6 +87,11 @@ public:
     bool operator<(const Player& other) const;
     bool operator>(const Player& other) const;
 
+    static int countActiveOthers(const std::vector<Player*>& players, const Player& current);
+
+    int getColorIndex() const;
+    void setColorIndex(int index);
+
 private:
     std::string username;
     Money money;
@@ -103,6 +108,7 @@ private:
     bool hasUsedSkillCardThisTurn;
     bool hasRolledDiceThisTurn;
     int turnCount;
+    int colorIndex{-1};
 };
 
 #endif

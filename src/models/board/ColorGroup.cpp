@@ -49,3 +49,22 @@ int ColorGroup::getMinBuildLevel() const {
 	}
 	return minLevel;
 }
+
+bool ColorGroup::satisfiesEvenBuildRule(const StreetTile& street) const {
+	const int level = street.getBuildingLevel();
+	if (level < 4) {
+		return level == getMinBuildLevel();
+	}
+	if (level == 4) {
+		return hasUniformBuildLevel();
+	}
+	return false;
+}
+
+void ColorGroup::demolishAllBuildings() {
+	for (StreetTile* street : streets) {
+		while (street && street->getBuildingLevel() > 0) {
+			street->demolish();
+		}
+	}
+}

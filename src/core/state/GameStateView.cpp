@@ -79,12 +79,13 @@ void GameStateView::refresh(
 		view.status = player->getStatus();
 		view.propertyCount = static_cast<int>(player->getProperties().size());
 		view.skillCardCount = static_cast<int>(player->getSkillCards().size());
+		view.colorIndex = player->getColorIndex();
 		players.push_back(view);
 	}
 
 	std::map<std::string, int> ownerColorIndexByName;
 	for (std::size_t i = 0; i < players.size(); ++i) {
-		ownerColorIndexByName[players[i].username] = static_cast<int>(i);
+		ownerColorIndexByName[players[i].username] = players[i].colorIndex;
 	}
 
 	properties.clear();
@@ -146,8 +147,12 @@ void GameStateView::refresh(
 				tv.color = street->getColor();
 				tv.hasHotel = street->hasHotel();
 				tv.houseCount = street->hasHotel() ? 4 : street->getBuildingLevel();
-			} else if (dynamic_cast<RailroadTile*>(tile)) {
+				tv.rentLevels = street->getRentLevels();
+				tv.houseCost = street->getHouseCost().getAmount();
+				tv.hotelCost = street->getHotelCost().getAmount();
+			} else if (auto* railroad = dynamic_cast<RailroadTile*>(tile)) {
 				tv.color = Color::GRAY;
+				tv.rentLevels = railroad->getRentTable();
 			} else if (dynamic_cast<UtilityTile*>(tile)) {
 				tv.color = Color::LIGHT_BLUE;
 			}
@@ -190,6 +195,20 @@ bool GameStateView::getHasUsedSkillCard() const {
 
 bool GameStateView::getExtraRollAvailable() const {
 	return extraRollAvailable;
+}
+
+const PlayerView* GameStateView::getActivePlayer() const {
+	if (!currentPlayerName.empty()) {
+		for (const PlayerView& player : players) {
+			if (player.username == currentPlayerName) {
+				return &player;
+			}
+		}
+	}
+	if (activePlayerIndex >= 0 && activePlayerIndex < static_cast<int>(players.size())) {
+		return &players[static_cast<size_t>(activePlayerIndex)];
+	}
+	return nullptr;
 }
 
 std::string GameStateView::render(const GameState& state) const {
